@@ -107,3 +107,48 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Registered new user: %s (ID: %s)", user.Username, user.ID)
 }
 
+type UserResponse struct {
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func getUserHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Only accept GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. Extract user ID from URL path
+	// URL format: /users/{id}
+	// Example: /users/ceb3499b-e0ca-4b3f-af07-5dcc287d0ac7
+	path := r.URL.Path
+	if len(path) <= len("/users/") {
+		http.Error(w, "User ID required", http.StatusBadRequest)
+		return
+	}
+	userID := path[len("/users/"):]
+
+	// 3. Look up user (thread-safe read)
+	mu.RLock()
+	user, exists := users[userID]
+	mu.RUnlock()
+
+	// 4. Check if user exists
+	if !exists {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// 5. Return user info
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		CreatedAt: user.CreatedAt,
+	})
+
+	log.Printf("Retrieved user: %s (ID: %s)", user.Username, user.ID)
+}
