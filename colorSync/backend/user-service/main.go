@@ -28,7 +28,7 @@ var (
 func main() {
 	// Register routes
 	http.HandleFunc("/register", registerHandler)
-	//http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/users/", getUserHandler)  // trailing slash for /users/{id}
 	http.HandleFunc("/health", healthHandler)
 
@@ -151,4 +151,56 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	log.Printf("Retrieved user: %s (ID: %s)", user.Username, user.ID)
+}
+
+type LoginRequest struct {
+	Username string `json:"username"`
+}
+
+type LoginResponse struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Message  string `json:"message"`
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Only accept POST requests
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. Parse JSON from request body
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Validate username
+	if req.Username == "" {
+		http.Error(w, "Username required", http.StatusBadRequest)
+		return
+	}
+
+	// 4. Check if user exists (thread-safe read)
+	mu.RLock()
+	user, exists := usersByName[req.Username]
+	mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// 5. Return user info (successful login)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(LoginResponse{
+		ID:       user.ID,
+		Username: user.Username,
+		Message:  "Login successful",
+	})
+
+	log.Printf("User logged in: %s (ID: %s)", user.Username, user.ID)
 }
