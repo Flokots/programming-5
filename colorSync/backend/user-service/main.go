@@ -123,13 +123,13 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	// 2. Extract user ID from URL path
 	// URL format: /users/{id}
 	// Example: /users/ceb3499b-e0ca-4b3f-af07-5dcc287d0ac7
+	const usersPrefix = "/users/"
 	path := r.URL.Path
-	if len(path) <= len("/users/") {
+	if len(path) <= len(usersPrefix) {
 		http.Error(w, "User ID required", http.StatusBadRequest)
 		return
 	}
-	userID := path[len("/users/"):]
-
+	userID := path[len(usersPrefix):]
 	// 3. Look up user (thread-safe read)
 	mu.RLock()
 	user, exists := users[userID]
