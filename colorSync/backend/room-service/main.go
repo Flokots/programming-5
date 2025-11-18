@@ -43,3 +43,82 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 }
+
+type JoinRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type JoinResponse struct {
+	RoomID  string `json:"room_id"`
+	Players []string `json:"players"`
+	Status string `json:"status"`
+	Message string `json:"message"`
+}
+
+func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Only accept POST requests
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. Parse request body
+	var req JoinRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Validate UserID 
+	if req.UserID == "" {
+		http.Error(w, "UserID required", http.StatusBadRequest)
+		return
+	}
+
+	// 4. Verify user exists by calling User Service
+	if !verifyUser(req.UserID) {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Find or create room (thread-safe)
+	mu.Lock()
+	defer mu.Unlock() // Unlock when function exits
+
+	var room *Room
+
+	// Check if there's a waiting room 
+	if waitingRoomID != nil {
+		// Join existing room
+		room = rooms[*waitingRoomID]
+		room.Players = append(room.Players, req.UserID)
+		room.Status = "full"
+		waitingRoomID = nil // No longer waiting
+		log.Printf("User %s joined room %s (now full)", req.UserID, room.ID)
+
+		// Notify Game Service to start the game
+		go notifyGameService(room.ID, room.Players) // Run in background
+
+	} else {
+		// Create new room 
+		room = &Room{
+			ID:      uuid.New().String(),
+			Players: []string{req.UserID},
+			Status:  "waiting",
+		}
+		rooms[room.ID] = room
+		waitingRoomID = &room.ID
+
+		log.Printf("User %s created and joined room %s (waiting for players)", req.UserID, room.ID)
+	}
+
+	// Send response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(JoinResponse{
+		RoomID:  room.ID,
+		Players: room.Players,
+		Status: room.Status,
+		Message: fmt.Sprintf("Joined room %s", room.ID),
+	})
+}
