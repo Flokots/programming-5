@@ -141,3 +141,27 @@ func verifyUser(userID string) bool {
 	log.Printf("Verified user %s exists", userID)
 	return true
 }
+
+// notifyGameService notifies Game Service to start the game
+func notifyGameService(roomID string, players []string) {
+	url := fmt.Sprintf("%s/game/start", gameServiceURL)
+
+	payload := map[string]interface{}{
+		"room_id": roomID,
+		"players": players,
+	}
+
+	jsonData, _ := json.Marshal(payload)
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error calling Game Service: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		log.Printf("Game Service notified for room %s", roomID)
+	} else {
+		log.Printf("Game Service returned status %d", resp.StatusCode)
+	}
+}
