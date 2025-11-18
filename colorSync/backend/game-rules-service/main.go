@@ -324,8 +324,40 @@ RoundEnd:
 
 
 func handleClick(game *Game, userID string, payload map[string]interface{}) {
-	// TODO: Implement click handling logic
-	log.Printf("Player %s clicked: %v", userID, payload)
+	game.mu.Lock()
+	defer game.mu.Unlock()
+
+	// Check if round already answered
+	if game.roundAnswered {
+		log.Printf("Player %s clicked but round already answered", userID)
+		return
+	}
+
+	// Get player's answer
+	answer, ok := payload["answer"].(string)
+	if !ok {
+		log.Printf("Invalid answer from player %s", userID)
+		return
+	}
+
+	// Calculate latency
+	latency:= time.Since(game.roundStartTime).Milliseconds()
+
+	// Check if answer is correct (must match the COLOR, not the word!)
+	correctAnswer := game.currentColor
+
+	log.Printf("Player %s clicked '%s' (correct answer: '%s') - %dms", userID, answer, correctAnswer, latency)
+
+	if answer == correctAnswer {
+		// Correct answer!
+		game.roundAnswered = true
+		game.roundWinner = userID
+		game.roundLatency = latency
+		log.Printf("Player %s answered correctly in %dms!", userID, latency)
+	} else {
+		// Wrong answer - they lose this round
+		log.Printf("Player %s answered incorrectly.", userID)
+	}
 }
 
 func broadcast(game *Game, msg WSMessage) {
@@ -344,7 +376,9 @@ func determineWinner(game *Game) string {
 	// Count wins per player
 	wins := make(map[string]int)
 	for _, result := range game.Results {
-		wins[result.Winner]++
+		if result.Winner != "" && result.Winner != "timeout" {
+			wins[result.Winner] ++
+		}	
 	}
 
 	// Find player with most wins
@@ -355,6 +389,10 @@ func determineWinner(game *Game) string {
 			maxWins = winCount
 			winner = userID
 		}
+	}
+
+	if winner == "" {
+		return "draw"
 	}
 
 	return winner
