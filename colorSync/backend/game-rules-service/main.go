@@ -150,7 +150,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "Failed to upgrade to WebSocket", http.StatusInternalServerError)
+		log.Printf("WebSocket upgrade failed for user %s: %v", userID, err)
 		return
 	}
 
@@ -288,10 +288,10 @@ func broadcast(game *Game, msg WSMessage) {
 	game.mu.Lock()
 	defer game.mu.Unlock()
 
-	for playerID, conn := range game.Connections {
+	for userID, conn := range game.Connections {
 		err := conn.WriteJSON(msg)
 		if err != nil {
-			log.Printf("Failed to send %s: %v", playerID, err)
+			log.Printf("Failed to send %s: %v", userID, err)
 		}
 	}
 }
@@ -306,10 +306,10 @@ func determineWinner(game *Game) string {
 	// Find player with most wins
 	maxWins := 0
 	winner := ""
-	for playerID, winCount := range wins {
+	for userID, winCount := range wins {
 		if winCount > maxWins {
 			maxWins = winCount
-			winner = playerID
+			winner = userID
 		}
 	}
 
