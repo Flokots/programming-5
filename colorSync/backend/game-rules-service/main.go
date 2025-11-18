@@ -16,11 +16,20 @@ import (
 type Game struct {
 	RoomID       string                     `json:"room_id"`
 	Players      []string                   `json:"players"`
-	Connections  map[string]*websocket.Conn // player ID to WebSocket connection
+	Connections  map[string]*websocket.Conn `json:"-"` // Don't serialize connections
 	Status       string                     `json:"status"`
 	CurrentRound int                        `json:"current_round"`
 	MaxRounds    int                        `json:"max_rounds"`
 	Results      []RoundResult              `json:"results"`
+
+	// Round state (for click handling)
+	currentWord string
+	currentColor string
+	roundStartTime time.Time
+	roundAnswered bool
+	roundWinner   string
+	roundLatency  int64
+
 	mu           sync.Mutex
 }
 
@@ -133,7 +142,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
 
 	if roomID == "" || userID == "" {
-		http.Error(w, "Missing room_id or user_id", http.StatusBadRequest)
+		http.Error(w, "room_id and user_id required", http.StatusBadRequest)
 		return
 	}
 
@@ -238,6 +247,16 @@ func playRound(game *Game, roundNum int) {
 	word := words[rand.Intn(len(words))]
 	color := colors[rand.Intn(len(colors))]
 
+	// Reset round state
+	game.mu.Lock()
+	game.currentWord = word
+	game.currentColor = color
+	game.roundStartTime = time.Now()
+	game.roundAnswered = false
+	game.roundWinner = ""
+	game.roundLatency = 0
+	game.mu.Unlock()
+
 	log.Printf("Round %d: Word='%s', Color='%s'", roundNum, word, color)
 
 	// Broadcast round start
@@ -250,21 +269,45 @@ func playRound(game *Game, roundNum int) {
 		},
 	})
 	
-	// Wait for first correct answer (stub for now)
-	// TODO: Track clicks and determine winner
+	// Wait for first correct answer (max 5 seconds)
+	timeout := time.After(5 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
-	time.Sleep(5 * time.Second) // Wait for players to respond
+	for {
+		select {
+		case <-timeout:
+			// Time's up, no one answered correctly
+			game.mu.Lock()
+			if !game.roundAnswered {
+				log.Printf("Round %d timed out - no correct answer", roundNum)
+				game.roundWinner = "timeout"
+			}
+			game.mu.Unlock()
+			goto RoundEnd
 
-	// Stub result
-	result := RoundResult{
-		Round: roundNum,
-		Word:  word,
-		Color: color,
-		Winner: game.Players[rand.Intn(2)], // Random winner for now
-		Latency: 1500, // Random latency
+		case <-ticker.C:
+			// Check if round has been answered
+			game.mu.Lock()
+			answered := game.roundAnswered
+			game.mu.Unlock()
+
+			if answered {
+				goto RoundEnd
+			}
+		}
 	}
 
+RoundEnd:
+	// Store result
 	game.mu.Lock()
+	result := RoundResult {
+		Round:   roundNum,
+		Word:    game.currentWord,
+		Color:   game.currentColor,
+		Winner:  game.roundWinner,
+		Latency: game.roundLatency,
+	}
 	game.Results = append(game.Results, result)
 	game.mu.Unlock()
 
@@ -272,12 +315,13 @@ func playRound(game *Game, roundNum int) {
 	broadcast(game, WSMessage{
 		Type: "ROUND_RESULT",
 		Payload: map[string]interface{}{
-			"round": roundNum,
-			"winner": result.Winner,
+			"round":   roundNum,
+			"winner":  result.Winner,
 			"latency_ms": result.Latency,
 		},
 	})
 }
+
 
 func handleClick(game *Game, userID string, payload map[string]interface{}) {
 	// TODO: Implement click handling logic
