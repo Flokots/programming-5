@@ -230,16 +230,47 @@ func runGame(game *Game) {
 		time.Sleep(3 * time.Second) // Pause between rounds
 	}
 
+	// Calculate final stats
+	stats:= make(map[string]map[string]interface{})
+	for _, playerID := range game.Players {
+		wins := 0
+		totalLatency := int64(0)
+
+		for _, result := range game.Results {
+			if result.Winner == playerID {
+				wins++
+				totalLatency += result.Latency
+			}
+		}
+
+		stats[playerID] = map[string]interface{}{
+			"wins": wins,
+			"total_latency_ms": totalLatency,
+			"avg_latency": totalLatency / int64(max(wins, 1)), // Avoid division by zero
+		}
+	}
+
+	winner := determineWinner(game)
+
 	// Game over
 	broadcast(game, WSMessage{
 		Type:    "GAME_OVER",
 		Payload: map[string]interface{}{
 			"results": game.Results,
-			"winner":  determineWinner(game),
+			"winner":  winner,
+			"stats":   stats,
 		},
 	})
 
 	log.Printf("Game finished for room %s", game.RoomID)
+}
+
+// Helper function to get max of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func playRound(game *Game, roundNum int) {
