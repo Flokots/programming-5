@@ -373,27 +373,62 @@ func broadcast(game *Game, msg WSMessage) {
 }
 
 func determineWinner(game *Game) string {
-	// Count wins per player
-	wins := make(map[string]int)
-	for _, result := range game.Results {
-		if result.Winner != "" && result.Winner != "timeout" {
-			wins[result.Winner] ++
-		}	
+	// Count wins and total latency per player
+	type PlayerStats struct {
+		Wins    int
+		TotalLatency int64
 	}
 
-	// Find player with most wins
-	maxWins := 0
-	winner := ""
-	for userID, winCount := range wins {
-		if winCount > maxWins {
-			maxWins = winCount
-			winner = userID
+	stats := make(map[string]*PlayerStats)
+
+	// Initialize stats for both players
+	for _, playerID := range game.Players {
+		stats[playerID] = &PlayerStats{
+			Wins:   0,
+			TotalLatency: 0,
 		}
 	}
 
-	if winner == "" {
-		return "draw"
+	// Calculate stats from results
+	for _, result := range game.Results {
+		if result.Winner != "" && result.Winner != "timeout" {
+			stats[result.Winner].Wins ++
+			stats[result.Winner].TotalLatency += result.Latency
+		}	
 	}
 
+	// Find winner by wins first, then by latency
+	var winner string
+	maxWins := 0
+	lowestLatency := int64(9999999999)
+
+	for playerID, playerStats := range stats {
+		// Primary: Most wins
+		if playerStats.Wins > maxWins {
+			maxWins = playerStats.Wins
+			lowestLatency = playerStats.TotalLatency
+			winner = playerID
+		} else if playerStats.Wins == maxWins {
+			// Tiebreaker: Lowest total latency
+			if playerStats.TotalLatency < lowestLatency {
+				lowestLatency = playerStats.TotalLatency
+				winner = playerID
+			}
+		}
+	}
+
+	// Log the decision
+	log.Printf("Final Scores:")
+	for playerID, playerStats := range stats {
+		log.Printf("- Player %s: %d wins, %dms total latency", playerID, playerStats.Wins, playerStats.TotalLatency)
+	}
+
+	// If no one won any rounds, it's a draw
+	if winner == "" {
+		log.Printf("Result: DRAW (0-0)")
+		return "draw"
+	}
+	
+	log.Printf("Winner: %s", winner)
 	return winner
 }
