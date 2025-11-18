@@ -40,7 +40,7 @@ type WSMessage struct {
 
 var (
 	games	  = make(map[string]*Game) // roomID to Game
-	gamesMutex sync.RWMutex
+	gamesMu sync.RWMutex
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Allow all origins for simplicity; adjust in production
@@ -277,4 +277,41 @@ func playRound(game *Game, roundNum int) {
 			"latency_ms": result.Latency,
 		},
 	})
+}
+
+func handleClick(game *Game, userID string, payload map[string]interface{}) {
+	// TODO: Implement click handling logic
+	log.Printf("Player %s clicked: %v", userID, payload)
+}
+
+func broadcast(game *Game, msg WSMessage) {
+	game.mu.Lock()
+	defer game.mu.Unlock()
+
+	for playerID, conn := range game.Connections {
+		err := conn.WriteJSON(msg)
+		if err != nil {
+			log.Printf("Failed to send %s: %v", playerID, err)
+		}
+	}
+}
+
+func determineWinner(game *Game) string {
+	// Count wins per player
+	wins := make(map[string]int)
+	for _, result := range game.Results {
+		wins[result.Winner]++
+	}
+
+	// Find player with most wins
+	maxWins := 0
+	winner := ""
+	for playerID, winCount := range wins {
+		if winCount > maxWins {
+			maxWins = winCount
+			winner = playerID
+		}
+	}
+
+	return winner
 }
