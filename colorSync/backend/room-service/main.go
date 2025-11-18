@@ -27,7 +27,6 @@ var (
 	gameServiceURL = "http://localhost:8003" // Game service endpoint
 )
 
-
 func main() {
 	// Register routes
 	http.HandleFunc("/join", joinRoomHandler)
@@ -49,10 +48,10 @@ type JoinRequest struct {
 }
 
 type JoinResponse struct {
-	RoomID  string `json:"room_id"`
+	RoomID  string   `json:"room_id"`
 	Players []string `json:"players"`
-	Status string `json:"status"`
-	Message string `json:"message"`
+	Status  string   `json:"status"`
+	Message string   `json:"message"`
 }
 
 func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +68,7 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Validate UserID 
+	// 3. Validate UserID
 	if req.UserID == "" {
 		http.Error(w, "UserID required", http.StatusBadRequest)
 		return
@@ -87,20 +86,20 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 
 	var room *Room
 
-	// Check if there's a waiting room 
+	// Check if there's a waiting room
 	if waitingRoomID != nil {
 		// Join existing room
 		room = rooms[*waitingRoomID]
 		room.Players = append(room.Players, req.UserID)
 		room.Status = "full"
 		waitingRoomID = nil // No longer waiting
-		log.Printf("User %s joined room %s (now full)", req.UserID, room.ID)
+		log.Printf("User %s joined room %s (ROOM FULL - 2/2 players)", req.UserID, room.ID)
 
 		// Notify Game Service to start the game
 		go notifyGameService(room.ID, room.Players) // Run in background
 
 	} else {
-		// Create new room 
+		// Create new room
 		room = &Room{
 			ID:      uuid.New().String(),
 			Players: []string{req.UserID},
@@ -109,7 +108,7 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 		rooms[room.ID] = room
 		waitingRoomID = &room.ID
 
-		log.Printf("User %s created and joined room %s (waiting for players)", req.UserID, room.ID)
+		log.Printf("User %s created room %s and is waiting for opponent(1/2 players)", req.UserID, room.ID)
 	}
 
 	// Send response
@@ -118,7 +117,7 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(JoinResponse{
 		RoomID:  room.ID,
 		Players: room.Players,
-		Status: room.Status,
+		Status:  room.Status,
 		Message: fmt.Sprintf("Joined room %s", room.ID),
 	})
 }
@@ -167,7 +166,7 @@ func notifyGameService(roomID string, players []string) {
 }
 
 type RoomResponse struct {
-	ID 	string   `json:"id"`
+	ID      string   `json:"id"`
 	Players []string `json:"players"`
 	Status  string   `json:"status"`
 }

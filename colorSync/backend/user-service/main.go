@@ -20,16 +20,16 @@ type User struct {
 
 // In-memory storage
 var (
-	users   = make(map[string]*User) //userID -> User
+	users       = make(map[string]*User) //userID -> User
 	usersByName = make(map[string]*User) //username -> User
-	mu      sync.RWMutex //Mutex for thread-safe access
+	mu          sync.RWMutex             //Mutex for thread-safe access
 )
 
 func main() {
 	// Register routes
 	http.HandleFunc("/register", registerHandler)
 	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/users/", getUserHandler)  // trailing slash for /users/{id}
+	http.HandleFunc("/users/", getUserHandler) // trailing slash for /users/{id}
 	http.HandleFunc("/health", healthHandler)
 
 	port := ":8001"
@@ -66,7 +66,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Validate username 
+	// 3. Validate username
 	if req.Username == "" {
 		http.Error(w, "Username required", http.StatusBadRequest)
 		return
