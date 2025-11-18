@@ -165,3 +165,44 @@ func notifyGameService(roomID string, players []string) {
 		log.Printf("Game Service returned status %d", resp.StatusCode)
 	}
 }
+
+type RoomResponse struct {
+	ID 	string   `json:"id"`
+	Players []string `json:"players"`
+	Status  string   `json:"status"`
+}
+
+func getRoomHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Only accept GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 2. Extract roomID from URL path
+	path := r.URL.Path
+	const roomsPrefix = "/rooms/"
+	if len(path) <= len(roomsPrefix) {
+		http.Error(w, "Room ID required", http.StatusBadRequest)
+		return
+	}
+	roomID := path[len(roomsPrefix):]
+
+	// 3. Look up room (thread-safe read)
+	mu.RLock()
+	room, exists := rooms[roomID]
+	mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "Room not found", http.StatusNotFound)
+		return
+	}
+
+	// 4. Return room info
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(RoomResponse{
+		ID:      room.ID,
+		Players: room.Players,
+		Status:  room.Status,
+	})
+}
