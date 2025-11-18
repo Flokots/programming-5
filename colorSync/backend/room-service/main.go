@@ -122,3 +122,22 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 		Message: fmt.Sprintf("Joined room %s", room.ID),
 	})
 }
+
+// verifyUser calls User Service to check if user exists
+func verifyUser(userID string) bool {
+	url := fmt.Sprintf("%s/users/%s", userServiceURL, userID)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Printf("Error calling User Service: %v", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("User %s not found in User Service", userID)
+		return false
+	}
+	log.Printf("Verified user %s exists", userID)
+	return true
+}
