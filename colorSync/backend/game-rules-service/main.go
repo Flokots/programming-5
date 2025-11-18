@@ -197,3 +197,84 @@ func handlePlayerMessages(game *Game, userID string, conn *websocket.Conn) {
 		}
 	}
 }
+
+func runGame(game *Game) {
+	// Send game start message
+	broadcast(game, WSMessage{
+		Type:    "GAME_START",
+		Payload: map[string]interface{}{
+			"room_id": game.RoomID,
+			"max_rounds": game.MaxRounds,
+			"players": game.Players,
+		},
+	})
+
+	time.Sleep(2 * time.Second) // Give players time to get ready
+
+	// Run rounds
+	for round := 1; round <= game.MaxRounds; round++ {
+		game.mu.Lock()
+		game.CurrentRound = round
+		game.mu.Unlock()
+
+		playRound(game, round)
+		time.Sleep(3 * time.Second) // Pause between rounds
+	}
+
+	// Game over
+	broadcast(game, WSMessage{
+		Type:    "GAME_OVER",
+		Payload: map[string]interface{}{
+			"results": game.Results,
+			"winner":  determineWinner(game),
+		},
+	})
+
+	log.Printf("Game finished for room %s", game.RoomID)
+}
+
+func playRound(game *Game, roundNum int) {
+	// Generate Stroop prompt
+	word := words[rand.Intn(len(words))]
+	color := colors[rand.Intn(len(colors))]
+
+	log.Printf("Round %d: Word='%s', Color='%s'", roundNum, word, color)
+
+	// Broadcast round start
+	broadcast(game, WSMessage{
+		Type: "ROUND_START",
+		Payload: map[string]interface{}{
+			"round": roundNum,
+			"word":  word,
+			"color": color,
+		},
+	})
+	
+	// Wait for first correct answer (stub for now)
+	// TODO: Track clicks and determine winner
+
+	time.Sleep(5 * time.Second) // Wait for players to respond
+
+	// Stub result
+	result := RoundResult{
+		Round: roundNum,
+		Word:  word,
+		Color: color,
+		Winner: game.Players[rand.Intn(2)], // Random winner for now
+		Latency: 1500, // Random latency
+	}
+
+	game.mu.Lock()
+	game.Results = append(game.Results, result)
+	game.mu.Unlock()
+
+	// Broadcast round result
+	broadcast(game, WSMessage{
+		Type: "ROUND_RESULT",
+		Payload: map[string]interface{}{
+			"round": roundNum,
+			"winner": result.Winner,
+			"latency_ms": result.Latency,
+		},
+	})
+}
