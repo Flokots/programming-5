@@ -171,3 +171,29 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	// Listen for messages from this player
 	go handlePlayerMessages(game, userID, conn)
 }
+
+func handlePlayerMessages(game *Game, userID string, conn *websocket.Conn) {
+	defer conn.Close()
+
+	for {
+		var msg WSMessage
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			log.Printf("Player %s disconnected: %v", userID, err)
+			return
+		}
+
+		log.Printf("Received message from player %s: %s", userID, msg.Type)
+
+		// Handle different message types
+		switch msg.Type {
+		case "CLICK":
+			handleClick(game, userID, msg.Payload)
+		case "PING":
+			// Heartbeat message
+			conn.WriteJSON(WSMessage{Type: "PONG", Payload: map[string]interface{}{}})
+		default:
+			log.Printf("Unknown message type from player %s: %s", userID, msg.Type)
+		}
+	}
+}
