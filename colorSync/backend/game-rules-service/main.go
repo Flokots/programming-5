@@ -23,22 +23,22 @@ type Game struct {
 	Results      []RoundResult              `json:"results"`
 
 	// Round state (for click handling)
-	currentWord string
-	currentColor string
+	currentWord    string
+	currentColor   string
 	roundStartTime time.Time
-	roundAnswered bool
-	roundWinner   string
-	roundLatency  int64
+	roundAnswered  bool
+	roundWinner    string
+	roundLatency   int64
 
-	mu           sync.Mutex
+	mu sync.Mutex
 }
 
 type RoundResult struct {
-	Round 	 int               `json:"round"`
-	Word     string             `json:"word"`
-	Color   string             `json:"color"`
-	Winner   string             `json:"winner"`
-	Latency int64			  `json:"latency_ms"`
+	Round   int    `json:"round"`
+	Word    string `json:"word"`
+	Color   string `json:"color"`
+	Winner  string `json:"winner"`
+	Latency int64  `json:"latency_ms"`
 }
 
 // WebSocket message types
@@ -48,8 +48,8 @@ type WSMessage struct {
 }
 
 var (
-	games	  = make(map[string]*Game) // roomID to Game
-	gamesMu sync.RWMutex
+	games    = make(map[string]*Game) // roomID to Game
+	gamesMu  sync.RWMutex
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Allow all origins for simplicity; adjust in production
@@ -59,7 +59,7 @@ var (
 
 // Stroop colors and words
 var colors = []string{"red", "blue", "green", "yellow"}
-var words  = []string{"RED", "BLUE", "GREEN", "YELLOW"}
+var words = []string{"RED", "BLUE", "GREEN", "YELLOW"}
 
 func main() {
 	http.HandleFunc("/game/start", startGameHandler)
@@ -109,19 +109,18 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create game session
 	game := &Game{
-		RoomID:      req.RoomID,
-		Players:     req.Players,
-		Connections: make(map[string]*websocket.Conn),
-		Status:      "waiting_for_players",
+		RoomID:       req.RoomID,
+		Players:      req.Players,
+		Connections:  make(map[string]*websocket.Conn),
+		Status:       "waiting_for_players",
 		CurrentRound: 0,
-		MaxRounds:   5,
-		Results:     []RoundResult{},
+		MaxRounds:    5,
+		Results:      []RoundResult{},
 	}
 
 	gamesMu.Lock()
 	games[req.RoomID] = game
 	gamesMu.Unlock()
-
 
 	log.Printf("Game created for room %s (waiting for WebSocket connections)", req.RoomID)
 	log.Printf("Players: %s vs %s", req.Players[0], req.Players[1])
@@ -165,16 +164,30 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Register player connection
 	game.mu.Lock()
+
+	// Check if game already started or finished
+	if game.Status == "in_progress" || game.Status == "finished" {
+		log.Printf("Player %s tried to connect but game is %s", userID, game.Status)
+		game.mu.Unlock()
+		conn.Close()
+		return
+	}
+
 	game.Connections[userID] = conn
 	connCount := len(game.Connections)
-	game.mu.Unlock()
-	
-	log.Printf("Player %s connected to room %s via WebSocket (%d/2)", userID, roomID, connCount)
 
-	// If both players are connected, start the game
-	if connCount == 2 {
+	log.Printf("Player %s connected via WebSocket (%d/2)", userID, connCount)
+
+	// Start game only if BOTH players connected and game not started yet
+	shouldStartGame := connCount == 2 && game.Status == "waiting_for_players"
+
+	if shouldStartGame {
+		game.Status = "in_progress" // Mark as started BEFORE unlocking!
+		game.mu.Unlock()
 		log.Printf("Both players connected! Starting game for room %s", roomID)
 		go runGame(game)
+	} else {
+		game.mu.Unlock()
 	}
 
 	// Listen for messages from this player
@@ -208,13 +221,19 @@ func handlePlayerMessages(game *Game, userID string, conn *websocket.Conn) {
 }
 
 func runGame(game *Game) {
+	// Reset game state for new game
+	game.mu.Lock()
+	game.Results = []RoundResult{} // Clear previous results
+	game.CurrentRound = 0
+	game.mu.Unlock()
+
 	// Send game start message
 	broadcast(game, WSMessage{
-		Type:    "GAME_START",
+		Type: "GAME_START",
 		Payload: map[string]interface{}{
-			"room_id": game.RoomID,
+			"room_id":    game.RoomID,
 			"max_rounds": game.MaxRounds,
-			"players": game.Players,
+			"players":    game.Players,
 		},
 	})
 
@@ -231,7 +250,7 @@ func runGame(game *Game) {
 	}
 
 	// Calculate final stats
-	stats:= make(map[string]map[string]interface{})
+	stats := make(map[string]map[string]interface{})
 	for _, playerID := range game.Players {
 		wins := 0
 		totalLatency := int64(0)
@@ -243,18 +262,28 @@ func runGame(game *Game) {
 			}
 		}
 
+		avgLatency := int64(0)
+		if wins > 0 {
+			avgLatency = totalLatency / int64(wins)
+		}
+
 		stats[playerID] = map[string]interface{}{
-			"wins": wins,
-			"total_latency_ms": totalLatency,
-			"avg_latency": totalLatency / int64(max(wins, 1)), // Avoid division by zero
+			"wins":          wins,
+			"total_latency": totalLatency,
+			"avg_latency":   avgLatency,
 		}
 	}
 
 	winner := determineWinner(game)
 
+	// Mark game as finished
+	game.mu.Lock()
+	game.Status = "finished"
+	game.mu.Unlock()
+
 	// Game over
 	broadcast(game, WSMessage{
-		Type:    "GAME_OVER",
+		Type: "GAME_OVER",
 		Payload: map[string]interface{}{
 			"results": game.Results,
 			"winner":  winner,
@@ -263,14 +292,15 @@ func runGame(game *Game) {
 	})
 
 	log.Printf("Game finished for room %s", game.RoomID)
-}
 
-// Helper function to get max of two integers
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	// After 5 seconds, allow players to reconnect for a new game
+    time.Sleep(5 * time.Second)
+
+	game.mu.Lock()
+    game.Status = "waiting_for_players"
+    game.Connections = make(map[string]*websocket.Conn) // Clear old connections
+    log.Printf("🔄 Room %s ready for new game", game.RoomID)
+    game.mu.Unlock()
 }
 
 func playRound(game *Game, roundNum int) {
@@ -299,7 +329,7 @@ func playRound(game *Game, roundNum int) {
 			"color": color,
 		},
 	})
-	
+
 	// Wait for first correct answer (max 5 seconds)
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -332,7 +362,7 @@ func playRound(game *Game, roundNum int) {
 RoundEnd:
 	// Store result
 	game.mu.Lock()
-	result := RoundResult {
+	result := RoundResult{
 		Round:   roundNum,
 		Word:    game.currentWord,
 		Color:   game.currentColor,
@@ -346,13 +376,12 @@ RoundEnd:
 	broadcast(game, WSMessage{
 		Type: "ROUND_RESULT",
 		Payload: map[string]interface{}{
-			"round":   roundNum,
-			"winner":  result.Winner,
+			"round":      roundNum,
+			"winner":     result.Winner,
 			"latency_ms": result.Latency,
 		},
 	})
 }
-
 
 func handleClick(game *Game, userID string, payload map[string]interface{}) {
 	game.mu.Lock()
@@ -372,7 +401,7 @@ func handleClick(game *Game, userID string, payload map[string]interface{}) {
 	}
 
 	// Calculate latency
-	latency:= time.Since(game.roundStartTime).Milliseconds()
+	latency := time.Since(game.roundStartTime).Milliseconds()
 
 	// Check if answer is correct (must match the COLOR, not the word!)
 	correctAnswer := game.currentColor
@@ -406,7 +435,7 @@ func broadcast(game *Game, msg WSMessage) {
 func determineWinner(game *Game) string {
 	// Count wins and total latency per player
 	type PlayerStats struct {
-		Wins    int
+		Wins         int
 		TotalLatency int64
 	}
 
@@ -415,7 +444,7 @@ func determineWinner(game *Game) string {
 	// Initialize stats for both players
 	for _, playerID := range game.Players {
 		stats[playerID] = &PlayerStats{
-			Wins:   0,
+			Wins:         0,
 			TotalLatency: 0,
 		}
 	}
@@ -423,9 +452,9 @@ func determineWinner(game *Game) string {
 	// Calculate stats from results
 	for _, result := range game.Results {
 		if result.Winner != "" && result.Winner != "timeout" {
-			stats[result.Winner].Wins ++
+			stats[result.Winner].Wins++
 			stats[result.Winner].TotalLatency += result.Latency
-		}	
+		}
 	}
 
 	// Find winner by wins first, then by latency
@@ -459,7 +488,7 @@ func determineWinner(game *Game) string {
 		log.Printf("Result: DRAW (0-0)")
 		return "draw"
 	}
-	
+
 	log.Printf("Winner: %s", winner)
 	return winner
 }
