@@ -17,12 +17,12 @@ type Client struct {
 	ui         *UI         // Pointer to UI renderer, handles terminal display
 }
 
-// NewClient creates and initializes a new Client instance
-func NewClient(username string) *Client {
+// newClient creates and initializes a new Client instance
+func newClient(username string) *Client {
 	return &Client{
 		username:  username,
-		apiClient: NewAPIClient(), // Initialize the API client
-		ui:        NewUI(),        // Initialize the UI renderer
+		apiClient: newAPIClient(), // Initialize the API client
+		ui:        newUI(),        // Initialize the UI renderer
 	}
 }
 
@@ -58,7 +58,7 @@ func (c *Client) Run() error {
 	c.ui.ShowInfo("Waiting for opponent...")
 
 	// Create game client
-	c.gameClient = NewGameClient(c.roomID, c.userID, c.username, c.ui)
+	c.gameClient = newGameClient(c.roomID, c.userID, c.username, c.ui)
 
 	// Connect WebSocket
 	if err := c.gameClient.Connect(); err != nil {

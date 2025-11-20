@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"sync"
 	"time"
@@ -21,6 +21,8 @@ type Game struct {
 	CurrentRound int                        `json:"current_round"`
 	MaxRounds    int                        `json:"max_rounds"`
 	Results      []RoundResult              `json:"results"`
+
+	disconnected map[string]bool  `json:"-"` // Track disconnected players playerID -> disconnected
 
 	// Round state (for click handling)
 	currentWord    string
@@ -64,7 +66,6 @@ var colors = []string{"red", "blue", "green", "yellow"}
 var words = []string{"RED", "BLUE", "GREEN", "YELLOW"}
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	http.HandleFunc("/game/start", startGameHandler)
 	http.HandleFunc("/game/ws", wsHandler)
 	http.HandleFunc("/health", healthHandler)
@@ -115,6 +116,7 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 		RoomID:       req.RoomID,
 		Players:      req.Players,
 		Connections:  make(map[string]*websocket.Conn),
+		disconnected: make(map[string]bool),
 		Status:       "waiting_for_players",
 		MaxRounds:    5,
 		Results:      []RoundResult{},
@@ -181,6 +183,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	game.Connections[userID] = conn
+	game.disconnected[userID] = false // Mark as connected
 	connCount := len(game.Connections)
 
 	log.Printf("Player %s connected via WebSocket (%d/2)", userID, connCount)
@@ -203,15 +206,23 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 func handlePlayerMessages(game *Game, userID string, conn *websocket.Conn) {
 	defer func() {
+		// Mark player as disconnected
+		game.mu.Lock()
+		game.disconnected[userID] = true
+		game.mu.Unlock()
+
 		conn.Close()
 		log.Printf("Player %s disconnected", userID)
+
+		// Check if game should end due to disconnection
+		checkDisconnection(game)
 	}()
 
 	for {
 		var msg WSMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("Player %s disconnected: %v", userID, err)
+			log.Printf("Player %s connection error: %v", userID, err)
 			return
 		}
 
@@ -226,6 +237,54 @@ func handlePlayerMessages(game *Game, userID string, conn *websocket.Conn) {
 			conn.WriteJSON(WSMessage{Type: "PONG", Payload: map[string]interface{}{}})
 		default:
 			log.Printf("Unknown message type from player %s: %s", userID, msg.Type)
+		}
+	}
+}
+
+// Check if game should end due to player disconnection
+func checkDisconnection(game *Game) {
+	game.mu.Lock()
+	defer game.mu.Unlock()
+
+	// Only handle if game is in progress
+	if game.Status != "in_progress" {
+		return
+	}
+
+	// Check if any player is disconnected
+	for playerID, disconnected := range game.disconnected {
+		if disconnected {
+			log.Printf("Player %s disconnected during game - ending game", playerID)
+
+			// Find the other player (winner by default)
+			var winner string
+			for _, pid := range game.Players {
+				if pid != playerID {
+					winner = pid
+					break
+				}
+			}
+
+			// Mark game as finished
+			game.Status = "finished"
+
+			// Notify remaining player
+			if conn, exists := game.Connections[winner]; exists {
+				conn.WriteJSON(WSMessage{
+					Type: "GAME_OVER",
+					Payload: map[string]interface{}{
+						"reason": "opponent_disconnected",
+						"winner": winner,
+						"results": game.Results,
+					},
+				})
+
+				// Close after delay
+				time.AfterFunc(3*time.Second, func() {
+					conn.Close()
+				})
+			}
+			return
 		}
 	}
 }
@@ -251,6 +310,22 @@ func runGame(game *Game) {
 
 	// Run rounds
 	for round := 1; round <= game.MaxRounds; round++ {
+		// Check if anyone disconnected
+		game.mu.Lock()
+		anyDisconnected := false
+		for _, disconnected := range game.disconnected {
+			if disconnected {
+				anyDisconnected = true
+				break
+			}
+		}
+		game.mu.Unlock()
+
+		if anyDisconnected {
+			log.Printf("Game endend early due to disconnection")
+			return
+		}
+
 		game.mu.Lock()
 		game.CurrentRound = round
 		game.mu.Unlock()
@@ -295,6 +370,7 @@ func runGame(game *Game) {
 	broadcast(game, WSMessage{
 		Type: "GAME_OVER",
 		Payload: map[string]interface{}{
+			"reason": "game_completed",
 			"results": game.Results,
 			"winner":  winner,
 			"stats":   stats,
@@ -303,23 +379,22 @@ func runGame(game *Game) {
 
 	log.Printf("Game finished")
 
-	// Reset after 5 seconds
+	// Cleanup after delay
 	time.Sleep(5 * time.Second)
 
 	game.mu.Lock()
 	for _, conn := range game.Connections {
 		conn.Close()
 	}
-	game.Status = "waiting_for_players"
-	game.Connections = make(map[string]*websocket.Conn)
-	log.Printf("Room ready for new game")
+	game.Status = "completed"
+	log.Printf("Room %s completed and closed", game.RoomID)
 	game.mu.Unlock()
 }
 
 func playRound(game *Game, roundNum int) {
-	// Generate Stroop prompt
-	word := words[rand.Intn(len(words))]
-	color := colors[rand.Intn(len(colors))]
+	// Generate Stroop prompt using rand/v2
+	word := words[rand.IntN(len(words))]
+	color := colors[rand.IntN(len(colors))]
 
 	// Reset round state properly!
 	game.mu.Lock()
