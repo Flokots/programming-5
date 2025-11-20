@@ -22,7 +22,7 @@ type Game struct {
 	MaxRounds    int                        `json:"max_rounds"`
 	Results      []RoundResult              `json:"results"`
 
-	disconnected map[string]bool  `json:"-"` // Track disconnected players playerID -> disconnected
+	disconnected map[string]bool `json:"-"` // Track disconnected players playerID -> disconnected
 
 	// Round state (for click handling)
 	currentWord    string
@@ -273,8 +273,8 @@ func checkDisconnection(game *Game) {
 				conn.WriteJSON(WSMessage{
 					Type: "GAME_OVER",
 					Payload: map[string]interface{}{
-						"reason": "opponent_disconnected",
-						"winner": winner,
+						"reason":  "opponent_disconnected",
+						"winner":  winner,
 						"results": game.Results,
 					},
 				})
@@ -370,7 +370,7 @@ func runGame(game *Game) {
 	broadcast(game, WSMessage{
 		Type: "GAME_OVER",
 		Payload: map[string]interface{}{
-			"reason": "game_completed",
+			"reason":  "game_completed",
 			"results": game.Results,
 			"winner":  winner,
 			"stats":   stats,
@@ -401,10 +401,10 @@ func playRound(game *Game, roundNum int) {
 	game.currentWord = word
 	game.currentColor = color
 	game.roundStartTime = time.Now()
-	game.roundAnswered = false    // RESET
-	game.roundFinished = false    // RESET
-	game.roundWinner = ""         // RESET
-	game.roundLatency = 0         // RESET
+	game.roundAnswered = false                // RESET
+	game.roundFinished = false                // RESET
+	game.roundWinner = ""                     // RESET
+	game.roundLatency = 0                     // RESET
 	game.wrongAnswers = make(map[string]bool) // RESET
 	game.mu.Unlock()
 
@@ -483,19 +483,19 @@ func handleClick(game *Game, userID string, payload map[string]interface{}) {
 
 	// Check if round is over
 	if game.roundFinished {
-		log.Printf("Player %s clicked but round finished", userID)
+		log.Printf("Player %s clicked but round already finished", userID)
 		return
 	}
 
 	// Check if round already answered correctly
 	if game.roundAnswered {
-		log.Printf("Player %s clicked but round already won", userID)
+		log.Printf("Player %s clicked but round already won by someone else", userID)
 		return
 	}
 
 	// Check if this player already got it wrong this round
 	if game.wrongAnswers[userID] {
-		log.Printf("Player %s already answered wrong this round", userID)
+		log.Printf("Player %s BLOCKED. Already answered wrong this round", userID)
 		return
 	}
 
@@ -512,7 +512,7 @@ func handleClick(game *Game, userID string, payload map[string]interface{}) {
 	// Check if answer is correct (must match the COLOR, not the word!)
 	correctAnswer := game.currentColor
 
-	log.Printf("Player %s clicked '%s' (correct: '%s') - %dms", 
+	log.Printf("Player %s clicked '%s' (correct: '%s') - %dms",
 		userID, answer, correctAnswer, latency)
 
 	if answer == correctAnswer {
@@ -525,6 +525,16 @@ func handleClick(game *Game, userID string, payload map[string]interface{}) {
 		// WRONG - block this player from trying again
 		game.wrongAnswers[userID] = true
 		log.Printf("Player %s WRONG (blocked for this round)", userID)
+
+		// Send feedback to client
+		if conn, exists := game.Connections[userID]; exists {
+			conn.WriteJSON(WSMessage{
+				Type: "ROUND_FEEDBACK",
+				Payload: map[string]interface{}{
+					"message": "Wrong answer! Blocked for this round.",
+				},
+			})
+		}
 	}
 }
 
