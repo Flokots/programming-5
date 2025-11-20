@@ -109,3 +109,43 @@ func (a *APIClient) register(username string) (string, error) {
 
 	return result.ID, nil
 }
+
+// JOIN ROOM
+type joinRoomRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type joinRoomResponse struct {
+	RoomID  string   `json:"room_id"`
+	Status  string   `json:"status"`
+	Message string   `json:"message"`
+}
+
+func (a *APIClient) joinRoom(userID string) (string, error) {
+	req := joinRoomRequest{UserID: userID}
+	body, _ := json.Marshal(req)
+
+	resp, err := a.httpClient.Post(
+		a.roomServiceURL+"/join",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return "", fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Errors
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("join room failed: %s", string(bodyBytes))
+	}
+
+	// Success
+	var result joinRoomResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return result.RoomID, nil
+}
