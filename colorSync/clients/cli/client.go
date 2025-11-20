@@ -25,3 +25,47 @@ func NewClient(username string) *Client {
 		ui:        NewUI(),        // Initialize the UI renderer
 	}
 }
+
+// Run executes the main game flow
+func (c *Client) Run() error {
+	// Show welcome screen
+	c.ui.ShowWelcome()
+
+	// STEP 1: Register user
+	c.ui.ShowInfo("Registering user...")
+
+	userID, err := c.apiClient.Register(c.username)
+	if err != nil {
+		return fmt.Errorf("registration failed: %w", err)
+	}
+	c.userID = userID
+
+	c.ui.ShowSuccess(fmt.Sprintf("Registered as %s", c.username))
+	log.Printf("DEBUG: User ID = %s", userID)
+
+	// STEP 2: Join matchmaking queue
+	c.ui.ShowInfo("Joining matchmaking queue...")
+
+	roomID, err := c.apiClient.JoinRoom(userID)
+	if err != nil {
+		return fmt.Errorf("failed to join room: %w", err)
+	}
+	c.roomID = roomID
+
+	log.Printf("Debug: Room ID = %s", roomID)
+
+	// STEP 3: Connect to game server via WebSocket
+	c.ui.ShowInfo("Waiting for opponent...")
+
+	// Create game client
+	c.gameClient = NewGameClient(c.roomID, c.userID, c.username, c.ui)
+
+	// Connect WebSocket
+	if err := c.gameClient.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to game: %w", err)
+	}
+	defer c.gameClient.Close() // Always close when done
+
+	// STEP 4: Start game loop
+	return c.gameClient.PlayGame()
+}
