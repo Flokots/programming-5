@@ -15,6 +15,7 @@ type UI struct {
 	green  *color.Color
 	yellow *color.Color
 	cyan   *color.Color
+	magenta *color.Color
 	bold   *color.Color
 }
 
@@ -26,6 +27,7 @@ func newUI() *UI {
 		green:  color.New(color.FgGreen),
 		yellow: color.New(color.FgYellow),
 		cyan:   color.New(color.FgCyan),
+		magenta: color.New(color.FgMagenta),
 		bold:   color.New(color.Bold),
 	}
 }
@@ -42,3 +44,47 @@ func (ui *UI) showWelcome() {
 	ui.cyan.Println("╚════════════════════════════════════════╝")
 	fmt.Println()
 }
+
+// showGameStart displays the game start information
+func (ui *UI) showGameStart(maxRounds int) {
+	ui.clear()
+	ui.bold.Println("🎮 GAME STARTING!")
+	fmt.Println()
+	ui.cyan.Printf("  You will play %d rounds\n", maxRounds)
+	ui.cyan.Println(" Match the COLOR of the text (not the word!)")
+	fmt.Println()
+	ui.yellow.Println("  🏆 Winner Determination:")
+	ui.yellow.Println("   1. Most rounds won")
+	ui.yellow.Println("   2. If tied: Lowest total latency wins")
+	ui.yellow.Println("   3. If still tied: It's a draw!")
+	fmt.Println()
+	ui.magenta.Println("  Controls: r=red  b=blue  g=green  y=yellow")
+	fmt.Println()
+	ui.cyan.Println("  Get ready...")
+}
+
+// showRound displays the Stroop test for the round
+func (ui *UI) showRound(round int, word string, textColor string) {
+	fmt.Println(strings.Repeat("─", 50))
+	ui.bold.Printf("ROUND %d\n", round)
+	fmt.Println()
+
+	ui.cyan.Printf("What COLOR is this text? → ")
+
+	switch textColor {
+	case "red": 
+		ui.red.Println(word)
+	case "blue":
+		ui.blue.Println(word)
+	case "green":
+		ui.green.Println(word)
+	case "yellow":
+		ui.yellow.Println(word)
+	default:
+		fmt.Println(word) // Fallback to default color
+	}
+
+	fmt.Println()
+	ui.yellow.Print("Your answer [r/b/g/y]: ")
+}
+
