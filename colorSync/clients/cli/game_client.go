@@ -19,13 +19,7 @@ type GameClient struct {
 	conn     *websocket.Conn
 	ui       *UI
 
-	// Game state
-	myScore       int
-	opponentScore int
-	currentRound  int
-
-	// Add this:
-	gameActive bool // ← NEW: Track if game is active
+	gameActive bool // Track if game is active
 }
 
 // WSMessage represents a WebSocket message
@@ -41,7 +35,7 @@ func newGameClient(roomID, userID, username string, ui *UI) *GameClient {
 		userID:     userID,
 		username:   username,
 		ui:         ui,
-		gameActive: false, // ← NEW
+		gameActive: false,
 	}
 }
 
@@ -71,33 +65,47 @@ func (g *GameClient) close() {
 func (g *GameClient) playGame() error {
 	messageChan := make(chan WSMessage)
 	errorChan := make(chan error)
+	done := make(chan struct{}) // Signal to stop goroutine
 
 	// Goroutine to receive messages
 	go func() {
+		defer close(messageChan) // Clean shutdown
 		for {
 			var msg WSMessage
 			err := g.conn.ReadJSON(&msg)
 			if err != nil {
-				// Only send error if game is still active
-				if g.gameActive { // ← Check if game ended
-					errorChan <- err
+				select {
+				case errorChan <- err:
+				case <-done: // Don't block if main loop exited
+					return
 				}
 				return
 			}
-			messageChan <- msg
+
+			select {
+			case messageChan <- msg:
+			case <-done: // Don't block if main loop exited
+				return
+			}
 		}
 	}()
 
 	// Main game loop
 	for {
 		select {
-		case msg := <-messageChan:
+		case msg, ok := <-messageChan:
+			if !ok {
+				return nil // Channel closed, exit loop
+			}
 			gameOver := g.handleMessage(msg)
 			if gameOver {
+				close(done)                        // Signal goroutine to stop
+				time.Sleep(100 * time.Millisecond) // Give goroutie time to exit
 				return nil
 			}
 
 		case err := <-errorChan:
+			close(done) // Signal goroutine to stop
 			// Only report error if game is still active
 			if g.gameActive {
 				return fmt.Errorf("connection error: %w", err)
@@ -121,7 +129,7 @@ func (g *GameClient) handleMessage(msg WSMessage) bool {
 
 	case "GAME_OVER":
 		g.handleGameOver(msg)
-		g.conn.Close() // ← NEW: Close connection immediately!
+		g.conn.Close() // Close connection immediately!
 		return true    // Game finished
 
 	case "WRONG_ANSWER":
@@ -144,10 +152,7 @@ func (g *GameClient) handleGameStart(msg WSMessage) {
 	maxRounds := int(msg.Payload["max_rounds"].(float64))
 
 	g.ui.showGameStart(maxRounds)
-	g.myScore = 0
-	g.opponentScore = 0
-	g.currentRound = 0
-	g.gameActive = true // ← NEW: Game is now active
+	g.gameActive = true // Game is now active
 }
 
 // handleRoundStart processes ROUND_START message and gets player input
@@ -155,8 +160,6 @@ func (g *GameClient) handleRoundStart(msg WSMessage) {
 	round := int(msg.Payload["round"].(float64))
 	word := msg.Payload["word"].(string)
 	color := msg.Payload["color"].(string)
-
-	g.currentRound = round
 
 	// Display the Stroop test
 	g.ui.showRound(round, word, color)
@@ -174,7 +177,7 @@ func (g *GameClient) handlePlayerInput() {
 	input = strings.TrimSpace(strings.ToLower(input))
 
 	// Check if game is still active
-	if !g.gameActive { // ← NEW: Ignore input if game ended
+	if !g.gameActive { //Ignore input if game ended
 		return
 	}
 
@@ -214,7 +217,7 @@ func (g *GameClient) sendClick(answer string) {
 	}
 }
 
-// handleRoundResult processes ROUND_RESULT message
+// handleRoundResult - displays ROUND_RESULT
 func (g *GameClient) handleRoundResult(msg WSMessage) {
 	round := int(msg.Payload["round"].(float64))
 
@@ -230,23 +233,13 @@ func (g *GameClient) handleRoundResult(msg WSMessage) {
 		latency = int64(latencyFloat)
 	}
 
-	// Update scores
-	if winner == g.userID {
-		g.myScore++
-	} else if winner != "" && winner != "timeout" {
-		g.opponentScore++
-	}
-
-	// Display result
-	iWon := winner == g.userID
-	isDraw := winner == "timeout" || winner == ""
-
-	g.ui.showRoundResult(round, iWon, isDraw, latency, g.myScore, g.opponentScore)
+	// Display result - pass winner string directly
+	g.ui.showRoundResult(round, winner, g.userID, latency)
 }
 
 // handleGameOver processes GAME_OVER message
 func (g *GameClient) handleGameOver(msg WSMessage) {
-	g.gameActive = false // ← NEW: Deactivate game (ignore pending inputs)
+	g.gameActive = false //  Deactivate game (ignore pending inputs)
 
 	// Safely get reason
 	reason := ""
@@ -271,7 +264,7 @@ func (g *GameClient) handleGameOver(msg WSMessage) {
 		return
 	}
 
-	// Normal game end - safely get stats
+	// Normal game end - safely get stats from backend
 	stats, ok := msg.Payload["stats"].(map[string]interface{})
 	if !ok {
 		g.ui.showError("Error: Invalid stats data")
@@ -300,14 +293,23 @@ func (g *GameClient) handleGameOver(msg WSMessage) {
 		avgLatency = int64(al)
 	}
 
-	iWon := winner == g.userID
-	isDraw := winner == "draw"
+	// Get opponent's wins (to calculate losses)
+	opponentWins := 0
+	for uid, statsData := range stats {
+		if uid != g.userID {
+			if opData, ok := statsData.(map[string]interface{}); ok {
+				if w, ok := opData["wins"].(float64); ok {
+					opponentWins = int(w)
+				}
+			}
+			break
+		}
+	}
 
-	losses := g.opponentScore
+	// Display game over screen
+	g.ui.showGameOver(winner, g.userID, wins, opponentWins, totalLatency, avgLatency)
 
-	g.ui.showGameOver(iWon, isDraw, wins, losses, totalLatency, avgLatency)
-
-	// Ask if player wants to play again
+	// Play again prompt
 	fmt.Println()
 	fmt.Print("Play again? [y/n]: ")
 
@@ -317,7 +319,7 @@ func (g *GameClient) handleGameOver(msg WSMessage) {
 
 	if input == "y" || input == "yes" {
 		fmt.Println("\n🔄 Restarting... Run the command again:")
-		fmt.Printf("   go run . --username %s\n", g.username)
+		fmt.Printf("  go run . --username %s\n", g.username)
 	} else {
 		fmt.Println("\n👋 Thanks for playing! Goodbye!")
 	}

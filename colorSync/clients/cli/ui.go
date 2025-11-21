@@ -88,3 +88,21 @@ func (ui *UI) showRound(round int, word string, textColor string) {
 	ui.yellow.Print("Your answer [r/b/g/y]: ")
 }
 
+// showRoundResult displays the result of a round
+func (ui *UI) showRoundResult(round int, winner string, myUserID string, latency int64) {
+	fmt.Println()
+
+	if winner == "timeout" {
+		ui.yellow.Println("⏱️  Time's up! No one answered in time.")
+	} else if winner == myUserID {
+		ui.green.Printf("✅ You won this round! (%dms)\n", latency)
+	} else {
+		ui.red.Println("❌ Opponent won this round!")
+	}
+
+	fmt.Println()
+	ui.magenta.Printf("Score: YOU %d - %d OPPONENT\n", myScore, opponentScore)
+	fmt.Println()
+}
+
+// showGameOver displays the final game results
