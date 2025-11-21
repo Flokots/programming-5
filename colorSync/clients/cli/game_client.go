@@ -2,50 +2,53 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"os/user"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// GameClient handles the game logic and WebSocket connection
+// GameClient handles WebSocket connection and game logic
 type GameClient struct {
-	roomID	 string
-	userID	 string
+	roomID   string
+	userID   string
 	username string
-	conn *websocket.Conn
-	ui  *UI
+	conn     *websocket.Conn
+	ui       *UI
 
 	// Game state
-	myScore    int
+	myScore       int
 	opponentScore int
-	currentRound int
+	currentRound  int
+
+	// Add this:
+	gameActive bool // ← NEW: Track if game is active
 }
 
-// WSMessage represents a message sent/received via WebSocket
+// WSMessage represents a WebSocket message
 type WSMessage struct {
-	Type    string          `json:"type"`
+	Type    string                 `json:"type"`
 	Payload map[string]interface{} `json:"payload"`
 }
 
-// newGameClient creates a new GameClient
-func newGameClient(roomID, userID, username string, ui *UI) *GameClient{
+// newGameClient creates a new game client
+func newGameClient(roomID, userID, username string, ui *UI) *GameClient {
 	return &GameClient{
-		roomID:   roomID,
-		userID:   userID,
-		username: username,
-		ui:       ui,
+		roomID:     roomID,
+		userID:     userID,
+		username:   username,
+		ui:         ui,
+		gameActive: false, // ← NEW
 	}
 }
 
-// connect establishes a WebSocket connection to the game server
+// connect establishes WebSocket connection
 func (g *GameClient) connect() error {
-	url := fmt.Sprintf("ws://localhost:8003/game/ws?room_id=%s&user_id=%s", g.roomID, g.userID)
+	url := fmt.Sprintf("ws://localhost:8003/game/ws?room_id=%s&user_id=%s",
+		g.roomID, g.userID)
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
@@ -66,7 +69,6 @@ func (g *GameClient) close() {
 
 // playGame runs the main game loop
 func (g *GameClient) playGame() error {
-	// Start listening for messages
 	messageChan := make(chan WSMessage)
 	errorChan := make(chan error)
 
@@ -76,24 +78,31 @@ func (g *GameClient) playGame() error {
 			var msg WSMessage
 			err := g.conn.ReadJSON(&msg)
 			if err != nil {
-				errorChan <- err
+				// Only send error if game is still active
+				if g.gameActive { // ← Check if game ended
+					errorChan <- err
+				}
 				return
 			}
 			messageChan <- msg
 		}
 	}()
 
-	// Main game loop 
+	// Main game loop
 	for {
 		select {
-		case msg := <- messageChan:
+		case msg := <-messageChan:
 			gameOver := g.handleMessage(msg)
 			if gameOver {
 				return nil
 			}
 
-		case err := <- errorChan:
-			return fmt.Errorf("connection error: %w", err)
+		case err := <-errorChan:
+			// Only report error if game is still active
+			if g.gameActive {
+				return fmt.Errorf("connection error: %w", err)
+			}
+			return nil // Game ended, ignore connection errors
 		}
 	}
 }
@@ -101,44 +110,47 @@ func (g *GameClient) playGame() error {
 // handleMessage processes incoming WebSocket messages
 func (g *GameClient) handleMessage(msg WSMessage) bool {
 	switch msg.Type {
-		case "GAME_START":
-			g.handleGameStart(msg)
+	case "GAME_START":
+		g.handleGameStart(msg)
 
-		case "ROUND_START":
-			g.handleRoundResult(msg)
+	case "ROUND_START":
+		g.handleRoundStart(msg)
 
-		case "ROUND_RESULT":
-			g.handleRoundResult(msg)
-			
-		case "GAME_OVER":
-			g.handleGameOver(msg)
-			return true // Game finished
+	case "ROUND_RESULT":
+		g.handleRoundResult(msg)
 
-		case "WRONG_ANSWER":
-			g.ui.showError("Wrong answer! Blocked for this round.")
-		
-		case "ERROR":
-			if errMsg, ok := msg.Payload["message"].(string); ok {
-				g.ui.showError(errMsg)
-			}
-		
-		default:
-			log.Printf("Unknown message type: %s", msg.Type)
+	case "GAME_OVER":
+		g.handleGameOver(msg)
+		g.conn.Close() // ← NEW: Close connection immediately!
+		return true    // Game finished
+
+	case "WRONG_ANSWER":
+		g.ui.showError("❌ Wrong! Blocked for this round.")
+
+	case "ERROR":
+		if errMsg, ok := msg.Payload["message"].(string); ok {
+			g.ui.showError(errMsg)
+		}
+
+	default:
+		log.Printf("Unknown message type: %s", msg.Type)
 	}
+
 	return false
 }
 
-// handleGameStart processes the GAME_START message
+// handleGameStart processes GAME_START message
 func (g *GameClient) handleGameStart(msg WSMessage) {
 	maxRounds := int(msg.Payload["max_rounds"].(float64))
-	
+
 	g.ui.showGameStart(maxRounds)
 	g.myScore = 0
 	g.opponentScore = 0
 	g.currentRound = 0
+	g.gameActive = true // ← NEW: Game is now active
 }
 
-// handleRoundStart processes the ROUND_START message and gets player input
+// handleRoundStart processes ROUND_START message and gets player input
 func (g *GameClient) handleRoundStart(msg WSMessage) {
 	round := int(msg.Payload["round"].(float64))
 	word := msg.Payload["word"].(string)
@@ -146,30 +158,35 @@ func (g *GameClient) handleRoundStart(msg WSMessage) {
 
 	g.currentRound = round
 
-	// Display the stroop test
+	// Display the Stroop test
 	g.ui.showRound(round, word, color)
 
 	// Get player input in a goroutine (non-blocking)
 	go g.handlePlayerInput()
 }
 
-// handlePlayerInput waits for player to click a color (select color)
+// handlePlayerInput waits for player to click a color
 func (g *GameClient) handlePlayerInput() {
 	reader := bufio.NewReader(os.Stdin)
 
-	// Read input 
+	// Read input
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
 
+	// Check if game is still active
+	if !g.gameActive { // ← NEW: Ignore input if game ended
+		return
+	}
+
 	// Map shortcuts to full color names
 	colorMap := map[string]string{
-		"r": "red",
-		"b": "blue",
-		"g": "green",
-		"y": "yellow",
-		"red": "red",
-		"blue": "blue",
-		"green": "green",
+		"r":      "red",
+		"b":      "blue",
+		"g":      "green",
+		"y":      "yellow",
+		"red":    "red",
+		"blue":   "blue",
+		"green":  "green",
 		"yellow": "yellow",
 	}
 
@@ -193,17 +210,23 @@ func (g *GameClient) sendClick(answer string) {
 	}
 
 	if err := g.conn.WriteJSON(msg); err != nil {
-		log.Printf("Failed to send CLICK: %v", err)
+		log.Printf("Failed to send click: %v", err)
 	}
 }
 
-// handleRoundResult processes the ROUND_RESULT message
+// handleRoundResult processes ROUND_RESULT message
 func (g *GameClient) handleRoundResult(msg WSMessage) {
 	round := int(msg.Payload["round"].(float64))
-	winner := msg.Payload["winner"].(string)
 
+	// Safely handle winner (might be nil, "timeout", or userID)
+	var winner string
+	if winnerVal, ok := msg.Payload["winner"]; ok && winnerVal != nil {
+		winner = winnerVal.(string)
+	}
+
+	// Safely handle latency (might not exist for timeout)
 	var latency int64
-	if latencyFloat, ok := msg.Payload("latency_ms").(float64); ok {
+	if latencyFloat, ok := msg.Payload["latency_ms"].(float64); ok {
 		latency = int64(latencyFloat)
 	}
 
@@ -213,56 +236,90 @@ func (g *GameClient) handleRoundResult(msg WSMessage) {
 	} else if winner != "" && winner != "timeout" {
 		g.opponentScore++
 	}
-	
-	// Display round result
+
+	// Display result
 	iWon := winner == g.userID
 	isDraw := winner == "timeout" || winner == ""
 
 	g.ui.showRoundResult(round, iWon, isDraw, latency, g.myScore, g.opponentScore)
 }
 
-// handleGameOver processes the GAME_OVER message
+// handleGameOver processes GAME_OVER message
 func (g *GameClient) handleGameOver(msg WSMessage) {
-	reason := msg.Payload["reason"].(string)
-	winner := msg.Payload["winner"].(string)
+	g.gameActive = false // ← NEW: Deactivate game (ignore pending inputs)
+
+	// Safely get reason
+	reason := ""
+	if r, ok := msg.Payload["reason"].(string); ok {
+		reason = r
+	}
+
+	// Safely get winner
+	winner := ""
+	if w, ok := msg.Payload["winner"].(string); ok {
+		winner = w
+	}
 
 	// Handle disconnection case
 	if reason == "opponent_disconnected" {
 		if winner == g.userID {
-			g.ui.showInfo("Opponent disconnected. You win by default!")
+			g.ui.showInfo("🎉 Opponent disconnected - You win by default!")
 		} else {
-			g.ui.showInfo("You disconnected from the game.")
+			g.ui.showInfo("You disconnected from the game")
 		}
 		time.Sleep(3 * time.Second)
 		return
 	}
 
-	// Normal game end
-	stats := msg.Payload["stats"].(map[string]interface{})
-	myStats := stats[g.userID].(map[string]interface{})
+	// Normal game end - safely get stats
+	stats, ok := msg.Payload["stats"].(map[string]interface{})
+	if !ok {
+		g.ui.showError("Error: Invalid stats data")
+		return
+	}
 
-	wins := int(myStats["wins"].(float64))
-	totalLatency := int64(myStats["total_latency"].(float64))
-	avgLatency := int64(myStats["avg_latency"].(float64))
+	myStatsData, ok := stats[g.userID].(map[string]interface{})
+	if !ok {
+		g.ui.showError("Error: Could not find your stats")
+		return
+	}
+
+	// Safely extract stats with defaults
+	wins := 0
+	if w, ok := myStatsData["wins"].(float64); ok {
+		wins = int(w)
+	}
+
+	totalLatency := int64(0)
+	if tl, ok := myStatsData["total_latency"].(float64); ok {
+		totalLatency = int64(tl)
+	}
+
+	avgLatency := int64(0)
+	if al, ok := myStatsData["avg_latency"].(float64); ok {
+		avgLatency = int64(al)
+	}
 
 	iWon := winner == g.userID
 	isDraw := winner == "draw"
 
-	g.ui.showGameOver(iWon, isDraw, wins, g.myScore-wins,  avgLatency, totalLatency)
+	losses := g.opponentScore
+
+	g.ui.showGameOver(iWon, isDraw, wins, losses, totalLatency, avgLatency)
 
 	// Ask if player wants to play again
 	fmt.Println()
-	fmt.Println("Play again? [y/n]: ")
+	fmt.Print("Play again? [y/n]: ")
 
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
 
 	if input == "y" || input == "yes" {
-		fmt.Println("\nRestarting.. Run the command again to play another game!")
-		fmt.Printf("go run . --username %s\n", g.username)
+		fmt.Println("\n🔄 Restarting... Run the command again:")
+		fmt.Printf("   go run . --username %s\n", g.username)
 	} else {
-		fmt.Println("Thanks for playing! Goodbye.")
+		fmt.Println("\n👋 Thanks for playing! Goodbye!")
 	}
 
 	time.Sleep(2 * time.Second)

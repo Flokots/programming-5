@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand/v2"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -68,11 +68,36 @@ var words = []string{"RED", "BLUE", "GREEN", "YELLOW"}
 func main() {
 	http.HandleFunc("/game/start", startGameHandler)
 	http.HandleFunc("/game/ws", wsHandler)
+	http.HandleFunc("/game/status", gameStatusHandler) // ← ADD THIS
 	http.HandleFunc("/health", healthHandler)
 
 	port := ":8003"
 	fmt.Printf("Game Rules Service running on port %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
+}
+
+// NEW: Check if game exists
+func gameStatusHandler(w http.ResponseWriter, r *http.Request) {
+	roomID := r.URL.Query().Get("room_id")
+	if roomID == "" {
+		http.Error(w, "room_id required", http.StatusBadRequest)
+		return
+	}
+
+	gamesMu.RLock()
+	game, exists := games[roomID]
+	gamesMu.RUnlock()
+
+	if !exists {
+		http.Error(w, "Game not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"room_id": game.RoomID,
+		"status":  game.Status,
+	})
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -322,7 +347,7 @@ func runGame(game *Game) {
 		game.mu.Unlock()
 
 		if anyDisconnected {
-			log.Printf("Game endend early due to disconnection")
+			log.Printf("Game ended early due to disconnection")
 			return
 		}
 
@@ -392,20 +417,27 @@ func runGame(game *Game) {
 }
 
 func playRound(game *Game, roundNum int) {
-	// Generate Stroop prompt using rand/v2
-	word := words[rand.IntN(len(words))]
-	color := colors[rand.IntN(len(colors))]
-
-	// Reset round state properly!
 	game.mu.Lock()
+
+	words := []string{"RED", "BLUE", "GREEN", "YELLOW"}
+	colors := []string{"red", "blue", "green", "yellow"}
+
+	// Create a new rand source with current time
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	word := words[r.Intn(len(words))]
+	color := colors[r.Intn(len(colors))]
+
+	log.Printf("🎨 Round %d: Word='%s' Color='%s'", roundNum, word, color) // ← DEBUG
+
 	game.currentWord = word
 	game.currentColor = color
 	game.roundStartTime = time.Now()
-	game.roundAnswered = false                // RESET
-	game.roundFinished = false                // RESET
-	game.roundWinner = ""                     // RESET
-	game.roundLatency = 0                     // RESET
-	game.wrongAnswers = make(map[string]bool) // RESET
+	game.roundAnswered = false
+	game.roundFinished = false
+	game.roundWinner = ""
+	game.wrongAnswers = make(map[string]bool)
+
 	game.mu.Unlock()
 
 	log.Printf("Round %d: Word='%s', Color='%s'", roundNum, word, color)

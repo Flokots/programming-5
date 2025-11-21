@@ -149,3 +149,22 @@ func (a *APIClient) joinRoom(userID string) (string, error) {
 
 	return result.RoomID, nil
 }
+
+// Check if game is ready for a room
+func (a *APIClient) checkGameReady(roomID string) (bool, error) {
+	resp, err := a.httpClient.Get(
+		fmt.Sprintf("http://localhost:8003/game/status?room_id=%s", roomID),
+	)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	// If game exists and is waiting for players, it's ready
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	}
+
+	// Game doesn't exist yet
+	return false, nil
+}

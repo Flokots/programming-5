@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"os/user"
+	"time"
 )
 
 // Client represents the CLI game client
@@ -28,44 +28,71 @@ func newClient(username string) *Client {
 
 // Run executes the main game flow
 func (c *Client) Run() error {
-	// Show welcome screen
-	c.ui.ShowWelcome()
+	c.ui.showWelcome()
 
-	// STEP 1: Register user
-	c.ui.ShowInfo("Registering user...")
-
-	userID, err := c.apiClient.Register(c.username)
+	// Login/Register
+	fmt.Println("Registering user...")
+	userID, err := c.apiClient.login(c.username)
 	if err != nil {
-		return fmt.Errorf("registration failed: %w", err)
+		fmt.Println("User not found, registering...")
+		userID, err = c.apiClient.register(c.username)
+		if err != nil {
+			return fmt.Errorf("registration failed: %w", err)
+		}
+		fmt.Printf("Registered as %s\n", c.username)
 	}
 	c.userID = userID
 
-	c.ui.ShowSuccess(fmt.Sprintf("Registered as %s", c.username))
-	log.Printf("DEBUG: User ID = %s", userID)
-
-	// STEP 2: Join matchmaking queue
-	c.ui.ShowInfo("Joining matchmaking queue...")
-
-	roomID, err := c.apiClient.JoinRoom(userID)
+	// Join room
+	fmt.Println("Joining matchmaking queue...")
+	roomID, err := c.apiClient.joinRoom(userID)
 	if err != nil {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 	c.roomID = roomID
-
 	log.Printf("Debug: Room ID = %s", roomID)
 
-	// STEP 3: Connect to game server via WebSocket
-	c.ui.ShowInfo("Waiting for opponent...")
+	// Wait for room to be full and game to start
+	fmt.Println("Waiting for opponent...")
+	if err := c.waitForGameReady(); err != nil {
+		return fmt.Errorf("failed waiting for game: %w", err)
+	}
 
-	// Create game client
-	c.gameClient = newGameClient(c.roomID, c.userID, c.username, c.ui)
-
-	// Connect WebSocket
-	if err := c.gameClient.Connect(); err != nil {
+	// NOW connect to game
+	log.Println("Connecting to game...")
+	gameClient := newGameClient(c.roomID, c.userID, c.username, c.ui)
+	if err := gameClient.connect(); err != nil {
 		return fmt.Errorf("failed to connect to game: %w", err)
 	}
-	defer c.gameClient.Close() // Always close when done
+	defer gameClient.close()
 
-	// STEP 4: Start game loop
-	return c.gameClient.PlayGame()
+	// Play game
+	if err := gameClient.playGame(); err != nil {
+		return fmt.Errorf("game error: %w", err)
+	}
+
+	return nil
+}
+
+// NEW: Wait for game to be ready
+func (c *Client) waitForGameReady() error {
+	maxAttempts := 30 // 30 seconds max wait
+
+	for i := 0; i < maxAttempts; i++ {
+		// Check if game exists
+		ready, err := c.apiClient.checkGameReady(c.roomID)
+		if err != nil {
+			log.Printf("Error checking game status: %v", err)
+		}
+
+		if ready {
+			fmt.Println("Opponent found! Starting game...")
+			return nil
+		}
+
+		// Wait 1 second before checking again
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("timeout waiting for opponent")
 }
