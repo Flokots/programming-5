@@ -1,9 +1,10 @@
-package main 
+package main
 
 import (
 	"fmt"
 	"strings"
-	
+	"time"
+
 	"github.com/fatih/color"
 )
 
@@ -111,11 +112,12 @@ func (ui *UI) showGameOver(winner string, myUserID string, wins, opponentWins in
 	fmt.Println()
 
 	// Determine result from winner
-	if winner == "draw" {
+	switch winner {
+case "draw":
 		ui.yellow.Println("  🤝 It's a DRAW!")
-	} else if winner == myUserID {
+	case myUserID:
 	ui.green.Println("  🎉 YOU WON! 🎉")
-	} else {
+	default:
 		ui.red.Println("  😞 YOU LOST. 😞")
 	}
 
@@ -135,16 +137,14 @@ func (ui *UI) showGameOver(winner string, myUserID string, wins, opponentWins in
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Println()
+
+	// Add closing message
+	time.Sleep(2 * time.Second) // Give user time to read stats
 }
 
 // showInfo displays an info message in cyan
 func (ui *UI) showInfo(message string) {
 	ui.cyan.Println(message)
-}
-
-// showSuccess displays a success message in green
-func (ui *UI) showSuccess(message string) {
-	ui.green.Println(message)
 }
 
 // showError displays an error message in red

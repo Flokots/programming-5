@@ -13,7 +13,6 @@ type Client struct {
 	roomID   string // Room ID from room service e.g "6392b3fc-2745-46df-bba5-60390b4ad397"
 
 	apiClient  *APIClient  // Pointer to HTTP client, handles the HTTP requests
-	gameClient *GameClient // Pointer to WebSocket client, handles the real-time game connection
 	ui         *UI         // Pointer to UI renderer, handles terminal display
 }
 
@@ -40,6 +39,8 @@ func (c *Client) Run() error {
 			return fmt.Errorf("registration failed: %w", err)
 		}
 		fmt.Printf("Registered as %s\n", c.username)
+	} else {
+		fmt.Printf("Welcome back, %s!\n", c.username)
 	}
 	c.userID = userID
 
@@ -52,7 +53,7 @@ func (c *Client) Run() error {
 	c.roomID = roomID
 	log.Printf("Debug: Room ID = %s", roomID)
 
-	// Wait for room to be full and game to start
+	// Wait for opponent
 	fmt.Println("Waiting for opponent...")
 	if err := c.waitForGameReady(); err != nil {
 		return fmt.Errorf("failed waiting for game: %w", err)
@@ -64,21 +65,30 @@ func (c *Client) Run() error {
 	if err := gameClient.connect(); err != nil {
 		return fmt.Errorf("failed to connect to game: %w", err)
 	}
-	defer gameClient.close()
+	
+	// Play game (this will block until game ends)
+	err = gameClient.playGame()
+	gameClient.close()
 
-	// Play game
-	if err := gameClient.playGame(); err != nil {
+	if err != nil {
 		return fmt.Errorf("game error: %w", err)
 	}
+
+	// show exit message
+	fmt.Println()
+    c.ui.showInfo("💡 To play again, run:")
+    fmt.Printf("   go run . --username %s\n", c.username)
+    fmt.Println()
+    fmt.Println("👋 Thanks for playing!")
 
 	return nil
 }
 
-// NEW: Wait for game to be ready
+//  Wait for game to be ready
 func (c *Client) waitForGameReady() error {
 	maxAttempts := 30 // 30 seconds max wait
 
-	for i := 0; i < maxAttempts; i++ {
+	for range maxAttempts {
 		// Check if game exists
 		ready, err := c.apiClient.checkGameReady(c.roomID)
 		if err != nil {

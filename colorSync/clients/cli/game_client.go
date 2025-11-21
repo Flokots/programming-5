@@ -308,21 +308,4 @@ func (g *GameClient) handleGameOver(msg WSMessage) {
 
 	// Display game over screen
 	g.ui.showGameOver(winner, g.userID, wins, opponentWins, totalLatency, avgLatency)
-
-	// Play again prompt
-	fmt.Println()
-	fmt.Print("Play again? [y/n]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "y" || input == "yes" {
-		fmt.Println("\n🔄 Restarting... Run the command again:")
-		fmt.Printf("   go run . --username %s\n", g.username)
-	} else {
-		fmt.Println("\n👋 Thanks for playing! Goodbye!")
-	}
-
-	time.Sleep(2 * time.Second)
 }
