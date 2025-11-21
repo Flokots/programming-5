@@ -99,10 +99,60 @@ func (ui *UI) showRoundResult(round int, winner string, myUserID string, latency
 	} else {
 		ui.red.Println("❌ Opponent won this round!")
 	}
-
-	fmt.Println()
-	ui.magenta.Printf("Score: YOU %d - %d OPPONENT\n", myScore, opponentScore)
-	fmt.Println()
 }
 
 // showGameOver displays the final game results
+func (ui *UI) showGameOver(winner string, myUserID string, wins, opponentWins int, totalLatency, avgLatency int64) {
+	ui.clear()
+	fmt.Println()
+	ui.bold.Println("🏁 GAME OVER!")
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println()
+
+	// Determine result from winner
+	if winner == "draw" {
+		ui.yellow.Println("  🤝 It's a DRAW!")
+	} else if winner == myUserID {
+	ui.green.Println("  🎉 YOU WON! 🎉")
+	} else {
+		ui.red.Println("  😞 YOU LOST. 😞")
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 50))
+
+	// Show stats
+	ui.cyan.Println("\n📊 Your Stats:")
+	fmt.Printf("  Rounds Won: %d\n", wins)
+	fmt.Printf(". Rounds Lost: %d\n", opponentWins)
+	fmt.Printf("  Total Latency: %dms\n", totalLatency)
+
+	if wins > 0 {
+		fmt.Printf("  Average Latency: %dms\n", avgLatency)
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println()
+}
+
+// showInfo displays an info message in cyan
+func (ui *UI) showInfo(message string) {
+	ui.cyan.Println(message)
+}
+
+// showSuccess displays a success message in green
+func (ui *UI) showSuccess(message string) {
+	ui.green.Println(message)
+}
+
+// showError displays an error message in red
+func (ui *UI) showError(message string) {
+	ui.red.Println(message)
+}
+
+// clear clears the terminal screen
+func (ui *UI) clear() {
+	fmt.Print("\033[H\033[2J")
+}

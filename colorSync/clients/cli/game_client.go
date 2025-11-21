@@ -319,7 +319,7 @@ func (g *GameClient) handleGameOver(msg WSMessage) {
 
 	if input == "y" || input == "yes" {
 		fmt.Println("\n🔄 Restarting... Run the command again:")
-		fmt.Printf("  go run . --username %s\n", g.username)
+		fmt.Printf("   go run . --username %s\n", g.username)
 	} else {
 		fmt.Println("\n👋 Thanks for playing! Goodbye!")
 	}
