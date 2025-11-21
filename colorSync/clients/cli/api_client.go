@@ -116,9 +116,9 @@ type joinRoomRequest struct {
 }
 
 type joinRoomResponse struct {
-	RoomID  string   `json:"room_id"`
-	Status  string   `json:"status"`
-	Message string   `json:"message"`
+	RoomID  string `json:"room_id"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
 
 func (a *APIClient) joinRoom(userID string) (string, error) {
