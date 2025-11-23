@@ -1,5 +1,5 @@
 // Web Socket message types (from backend)
-export type MessageType = 
+export type MessageType =
     | "GAME_START"
     | "ROUND_START"
     | "ROUND_RESULT"
@@ -10,7 +10,7 @@ export type MessageType =
 
 export interface WSMessage {
     type: MessageType;
-    payload: Record<string, unknown>;
+    payload: unknown;
 }
 
 // Specify Message Payloads
@@ -51,7 +51,7 @@ export interface ClickPayload {
 }
 
 // Game State (for React components)
-export type GameStatus = 
+export type GameStatus =
     | "connecting"
     | "waiting"
     | "playing"
@@ -72,7 +72,7 @@ export interface GameState {
     opponentScore: number;
 
     // Game over data
-    winner: string | null; 
+    winner: string | null;
     myStats: PlayerStats | null;
 
     // Error handling

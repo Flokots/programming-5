@@ -1,0 +1,223 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import type {
+    WSMessage,
+    GameState,
+    GameStartPayload,
+    RoundStartPayload,
+    RoundResultPayload,
+    GameOverPayload,
+    ErrorPayload,
+    ClickPayload,
+    StroopColor
+} from '../types/game';
+
+
+export function useGameWebSocket(roomId: string, userId: string) {
+    // Game state
+    const [gameState, setGameState] = useState<GameState>({
+        status: 'connecting',
+        currentRound: 0,
+        maxRounds: 0,
+        word: '',
+        color: '',
+        myScore: 0,
+        opponentScore: 0,
+        winner: null,
+        myStats: null,
+        errorMessage: null,
+        userId,
+        roomId,
+    });
+
+    const [isConnected, setIsConnected] = useState(false);
+
+    // WebSocket reference(persists across renders)
+    const wsRef = useRef<WebSocket | null>(null);
+
+    // Message Handlers
+    const handleGameStart = useCallback((payload: GameStartPayload) => {
+        console.log('Game starting with', payload.max_rounds, 'rounds');
+        setGameState(prev => ({
+            ...prev,
+            status: 'playing',
+            maxRounds: payload.max_rounds,
+            currentRound: 0,
+            myScore: 0,
+            opponentScore: 0,
+        }));
+    }, []);
+
+    const handleRoundStart = useCallback((payload: RoundStartPayload) => {
+        console.log(`Round ${payload.round}: ${payload.word} (${payload.color})`);
+        setGameState(prev => ({
+            ...prev,
+            currentRound: payload.round,
+            word: payload.word,
+            color: payload.color,
+        }));
+    }, []);
+
+    const handleRoundResult = useCallback((payload: RoundResultPayload) => {
+        console.log(`Round ${payload.round} result:`, payload.winner);
+
+        // Update scores based on winner
+        setGameState(prev => {
+            let newMyScore = prev.myScore;
+            let newOpponentScore = prev.opponentScore;
+
+            if (payload.winner === userId) {
+                newMyScore += 1;
+            } else if (payload.winner && payload.winner !== 'timeout') {
+                newOpponentScore += 1;
+            }
+            return {
+                ...prev,
+                myScore: newMyScore,
+                opponentScore: newOpponentScore,
+            };
+        });
+    }, [userId]);
+
+    const handleGameOver = useCallback((payload: GameOverPayload) => {
+        console.log('Game over! Winner:', payload.winner);
+
+        // Get my stats from the payload
+        const myStats = payload.stats[userId] || null;
+
+        setGameState(prev => ({
+            ...prev,
+            status: 'game_over',
+            winner: payload.winner,
+            myStats,
+        }));
+    }, [userId]);
+
+    const handleWrongAnswer = useCallback(() => {
+        console.log('Wrong answer! Blocked for this round');
+        // Could show a temporary error message in UI
+        setGameState(prev => ({
+            ...prev,
+            errorMessage: 'Wrong answer! Wait for the next round.',
+        }));
+
+        // Clear error message after 2 seconds
+        setTimeout(() => {
+            setGameState(prev => ({
+                ...prev,
+                errorMessage: null,
+            }));
+        }, 2000);
+    }, []);
+
+    const handleError = useCallback((payload: ErrorPayload) => {
+        console.error('Server error:', payload.message);
+        setGameState(prev => ({
+            ...prev,
+            status: 'error',
+            errorMessage: payload.message,
+        }));
+    }, []);
+
+    useEffect(() => {
+        // Connect to game-rules-service WebSocket
+        const ws = new WebSocket(`ws://localhost:8003/game/ws?room_id=${roomId}&user_id=${userId}`);
+
+        wsRef.current = ws;
+
+        // Connection opened
+        ws.onopen = () => {
+            console.log('WebSocket connected to game');
+            setIsConnected(true);
+            setGameState(prev => ({ ...prev, status: 'waiting' }));
+        };
+
+        // Handle incoming messages
+        ws.onmessage = (event) => {
+            const msg: WSMessage = JSON.parse(event.data);
+            console.log('Received message:', msg.type, msg.payload);
+
+            switch (msg.type) {
+                case "GAME_START":
+                    handleGameStart(msg.payload as GameStartPayload);
+                    break;
+
+                case "ROUND_START":
+                    handleRoundStart((msg.payload as RoundStartPayload));
+                    break;
+
+                case "ROUND_RESULT":
+                    handleRoundResult(msg.payload as RoundResultPayload);
+                    break;
+
+                case "GAME_OVER":
+                    handleGameOver(msg.payload as GameOverPayload);
+                    break;
+
+                case "WRONG_ANSWER":
+                    handleWrongAnswer();
+                    break;
+
+                case "ERROR":
+                    handleError(msg.payload as ErrorPayload);
+                    break;
+
+                default:
+                    console.warn('Unknown message type:', msg.type);
+            }
+        };
+
+        // Connection closed
+        ws.onclose = () => {
+            console.log('WebSocket disconnected');
+            setIsConnected(false);
+        };
+
+        // Connection error 
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            setGameState(prev => ({
+                ...prev,
+                status: 'error',
+                errorMessage: 'Connection error occurred.',
+            }));
+        };
+
+        // Cleanup on unmount
+        return () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        }
+    }, [roomId, userId, handleGameStart, handleRoundStart, handleRoundResult, handleGameOver, handleWrongAnswer, handleError]);
+
+    // Send Answer Function
+    const sendAnswer = useCallback((color: StroopColor) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+
+        if (gameState.status !== 'playing') {
+            console.warn('Cannot send answer, game not in playing state');
+            return;
+        }
+
+        const message: WSMessage = {
+            type: 'CLICK',
+            payload: {
+                answer: color
+            } as ClickPayload,
+        };
+
+        console.log('Sending answer:', color);
+        wsRef.current.send(JSON.stringify(message));
+    }, [gameState.status]);
+
+    // Return hook interface
+    return {
+        gameState,
+        sendAnswer,
+        isConnected,
+    };
+
+} 
