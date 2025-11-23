@@ -81,7 +81,7 @@ function App() {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
               className="username-input"
-              onKeyPress={(e) => e.key === 'Enter' && handleJoinGame()}
+              onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
               autoFocus
             />
             <button
