@@ -1,0 +1,374 @@
+/*
+   Game Over Container
+*/
+.game-over {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.game-over.winner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.game-over.loser {
+  background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
+}
+
+/*
+   Game Over Card
+*/
+.game-over-card {
+  background: white;
+  border-radius: 30px;
+  padding: 50px 40px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+   Result Header
+*/
+.result-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.result-emoji {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: bounce 1s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.result-title {
+  font-size: 48px;
+  margin: 0 0 10px 0;
+  font-weight: bold;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.result-subtitle {
+  font-size: 18px;
+  color: #666;
+  margin: 0;
+}
+
+/*
+   Final Score
+*/
+.final-score {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+  border-radius: 20px;
+  padding: 30px;
+  margin-bottom: 30px;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+
+.player-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-label {
+  font-size: 14px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #666;
+  letter-spacing: 1px;
+}
+
+.player-points {
+  font-size: 56px;
+  font-weight: bold;
+  color: #333;
+}
+
+.winner-score .player-points {
+  color: #667eea;
+  text-shadow: 2px 2px 4px rgba(102, 126, 234, 0.2);
+}
+
+.winner-score .player-label {
+  color: #667eea;
+}
+
+.score-divider {
+  font-size: 40px;
+  color: #ccc;
+  font-weight: 300;
+}
+
+/*
+   Stats Section
+*/
+.stats-section {
+  background: #f9f9f9;
+  border-radius: 20px;
+  padding: 30px;
+  margin-bottom: 30px;
+}
+
+.stats-title {
+  text-align: center;
+  margin: 0 0 25px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #333;
+}
+
+.stat-value.highlight {
+  color: #667eea;
+}
+
+/*
+   Performance Badge
+*/
+.performance-badge {
+  text-align: center;
+  padding: 15px 25px;
+  border-radius: 25px;
+  font-weight: bold;
+  font-size: 16px;
+  margin-top: 20px;
+}
+
+.performance-badge.fast {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  color: white;
+  animation: glow 2s ease-in-out infinite;
+}
+
+.performance-badge.good {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.performance-badge.slow {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  color: #333;
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.8);
+  }
+}
+
+/*
+   Disconnect Message
+*/
+.disconnect-message {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.disconnect-message p {
+  margin: 5px 0;
+  color: #856404;
+}
+
+/*
+   Action Buttons
+*/
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.play-again-button,
+.home-button {
+  flex: 1;
+  padding: 18px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.play-again-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.play-again-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+}
+
+.home-button {
+  background: #f0f0f0;
+  color: #333;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.home-button:hover {
+  background: #e0e0e0;
+  transform: translateY(-3px);
+}
+
+.play-again-button:active,
+.home-button:active {
+  transform: translateY(-1px);
+}
+
+/*
+   Fun Fact
+*/
+.fun-fact {
+  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+  border-left: 4px solid #00acc1;
+  border-radius: 10px;
+  padding: 15px 20px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.fun-fact p {
+  margin: 5px 0;
+  color: #006064;
+}
+
+.fun-fact strong {
+  color: #00838f;
+}
+
+/*
+   Fade In Animation
+*/
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+   Responsive Design
+*/
+@media (max-width: 600px) {
+  .game-over-card {
+    padding: 30px 20px;
+  }
+
+  .result-emoji {
+    font-size: 60px;
+  }
+
+  .result-title {
+    font-size: 36px;
+  }
+
+  .result-subtitle {
+    font-size: 16px;
+  }
+
+  .player-points {
+    font-size: 42px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .play-again-button,
+  .home-button {
+    width: 100%;
+  }
+
+  .fun-fact {
+    font-size: 12px;
+  }
+}
+
+/*
+   Accessibility - Reduced Motion
+*/
+@media (prefers-reduced-motion: reduce) {
+  .game-over-card,
+  .result-emoji,
+  .performance-badge.fast {
+    animation: none;
+  }
+}
