@@ -11,7 +11,6 @@ import type {
     StroopColor
 } from '../types/game';
 
-
 export function useGameWebSocket(roomId: string, userId: string) {
     // Game state
     const [gameState, setGameState] = useState<GameState>({
@@ -30,11 +29,9 @@ export function useGameWebSocket(roomId: string, userId: string) {
     });
 
     const [isConnected, setIsConnected] = useState(false);
-
-    // WebSocket reference(persists across renders)
     const wsRef = useRef<WebSocket | null>(null);
 
-    // Message Handlers
+    //  Define Message Handlers
     const handleGameStart = useCallback((payload: GameStartPayload) => {
         console.log('Game starting with', payload.max_rounds, 'rounds');
         setGameState(prev => ({
@@ -60,7 +57,6 @@ export function useGameWebSocket(roomId: string, userId: string) {
     const handleRoundResult = useCallback((payload: RoundResultPayload) => {
         console.log(`Round ${payload.round} result:`, payload.winner);
 
-        // Update scores based on winner
         setGameState(prev => {
             let newMyScore = prev.myScore;
             let newOpponentScore = prev.opponentScore;
@@ -81,7 +77,6 @@ export function useGameWebSocket(roomId: string, userId: string) {
     const handleGameOver = useCallback((payload: GameOverPayload) => {
         console.log('Game over! Winner:', payload.winner);
 
-        // Get my stats from the payload
         const myStats = payload.stats[userId] || null;
 
         setGameState(prev => ({
@@ -94,13 +89,11 @@ export function useGameWebSocket(roomId: string, userId: string) {
 
     const handleWrongAnswer = useCallback(() => {
         console.log('Wrong answer! Blocked for this round');
-        // Could show a temporary error message in UI
         setGameState(prev => ({
             ...prev,
             errorMessage: 'Wrong answer! Wait for the next round.',
         }));
 
-        // Clear error message after 2 seconds
         setTimeout(() => {
             setGameState(prev => ({
                 ...prev,
@@ -118,9 +111,19 @@ export function useGameWebSocket(roomId: string, userId: string) {
         }));
     }, []);
 
+    // WebSocket Effect
     useEffect(() => {
-        // Connect to game-rules-service WebSocket
-        const ws = new WebSocket(`ws://localhost:8003/game/ws?room_id=${roomId}&user_id=${userId}`);
+        // Don't connect if roomId or userId are empty
+        if (!roomId || !userId) {
+            console.log('Skipping WebSocket connection (no roomId or userId)');
+            return;
+        }
+
+        console.log('Connecting to WebSocket:', roomId, userId);
+        
+        const ws = new WebSocket(
+            `ws://localhost:8003/game/ws?room_id=${roomId}&user_id=${userId}`
+        );
 
         wsRef.current = ws;
 
@@ -131,7 +134,6 @@ export function useGameWebSocket(roomId: string, userId: string) {
             setGameState(prev => ({ ...prev, status: 'waiting' }));
         };
 
-        // Handle incoming messages
         ws.onmessage = (event) => {
             const msg: WSMessage = JSON.parse(event.data);
             console.log('Received message:', msg.type, msg.payload);
@@ -142,7 +144,7 @@ export function useGameWebSocket(roomId: string, userId: string) {
                     break;
 
                 case "ROUND_START":
-                    handleRoundStart((msg.payload as RoundStartPayload));
+                    handleRoundStart(msg.payload as RoundStartPayload);
                     break;
 
                 case "ROUND_RESULT":
@@ -166,13 +168,11 @@ export function useGameWebSocket(roomId: string, userId: string) {
             }
         };
 
-        // Connection closed
         ws.onclose = () => {
             console.log('WebSocket disconnected');
             setIsConnected(false);
         };
 
-        // Connection error 
         ws.onerror = (error) => {
             console.error('WebSocket error:', error);
             setGameState(prev => ({
@@ -182,12 +182,11 @@ export function useGameWebSocket(roomId: string, userId: string) {
             }));
         };
 
-        // Cleanup on unmount
         return () => {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.close();
             }
-        }
+        };
     }, [roomId, userId, handleGameStart, handleRoundStart, handleRoundResult, handleGameOver, handleWrongAnswer, handleError]);
 
     // Send Answer Function
@@ -213,11 +212,11 @@ export function useGameWebSocket(roomId: string, userId: string) {
         wsRef.current.send(JSON.stringify(message));
     }, [gameState.status]);
 
-    // Return hook interface
+    // Return Hook Interface
+
     return {
         gameState,
         sendAnswer,
         isConnected,
     };
-
-} 
+}
