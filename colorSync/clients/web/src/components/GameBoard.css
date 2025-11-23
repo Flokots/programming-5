@@ -1,0 +1,330 @@
+/*
+   Game Board Container
+*/
+.game-board {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+/*
+   Waiting State
+*/
+.waiting-state {
+  justify-content: center;
+  align-items: center;
+}
+
+.waiting-content {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+}
+
+.waiting-content h2 {
+  margin: 20px 0 10px 0;
+  color: #333;
+  font-size: 32px;
+}
+
+.waiting-content p {
+  color: #666;
+  font-size: 18px;
+  margin: 10px 0 20px 0;
+}
+
+.connection-status {
+  margin-top: 20px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f5f5f5;
+}
+
+.connection-status .connected {
+  color: #00aa00;
+  font-weight: bold;
+}
+
+.connection-status .disconnected {
+  color: #ff4444;
+  font-weight: bold;
+}
+
+/*
+   Error State
+*/
+.error-state {
+  justify-content: center;
+  align-items: center;
+}
+
+.error-content {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+}
+
+.error-content h2 {
+  color: #ff4444;
+  margin: 0 0 20px 0;
+  font-size: 28px;
+}
+
+.error-content p {
+  color: #666;
+  font-size: 16px;
+  margin: 0 0 30px 0;
+}
+
+.retry-button {
+  padding: 15px 30px;
+  font-size: 16px;
+  font-weight: bold;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.retry-button:hover {
+  transform: translateY(-2px);
+}
+
+/*
+   Playing State - Header
+*/
+.playing-state {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 15px 30px;
+  border-radius: 15px;
+  margin-bottom: 20px;
+}
+
+.player-name {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.status-dot.connected {
+  background: #00ff00;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+.status-dot.disconnected {
+  background: #ff0000;
+  box-shadow: 0 0 10px #ff0000;
+}
+
+/*
+   Stroop Container
+*/
+.stroop-container {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  margin: 20px 0;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.waiting-for-round {
+  text-align: center;
+}
+
+.waiting-for-round p {
+  color: #666;
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+/*
+   Error Banner
+*/
+.error-banner {
+  background: #ff4444;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 10px;
+  text-align: center;
+  font-weight: bold;
+  margin: 20px 0;
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+/*
+   Answer Buttons
+*/
+.answer-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.answer-button {
+  padding: 30px 20px;
+  font-size: 24px;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+}
+
+.answer-button:hover:not(:disabled) {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.answer-button:active:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.answer-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button Colors */
+.answer-button.red {
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  color: white;
+}
+
+.answer-button.blue {
+  background: linear-gradient(135deg, #0000ff 0%, #0000cc 100%);
+  color: white;
+}
+
+.answer-button.green {
+  background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%);
+  color: white;
+}
+
+.answer-button.yellow {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  color: #333;
+}
+
+/*
+   Game Hint
+*/
+.game-hint {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 15px 30px;
+  border-radius: 10px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.game-hint strong {
+  color: #ffd700;
+}
+
+/*
+   Pulse Animation
+*/
+.pulse-animation {
+  font-size: 48px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/*
+   Responsive Design
+*/
+@media (max-width: 768px) {
+  .answer-buttons {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .answer-button {
+    padding: 20px 15px;
+    font-size: 18px;
+  }
+
+  .game-header {
+    padding: 10px 20px;
+  }
+
+  .player-name {
+    font-size: 16px;
+  }
+
+  .stroop-container {
+    padding: 40px 20px;
+    min-height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-board {
+    padding: 10px;
+  }
+
+  .answer-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .game-hint {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+}
