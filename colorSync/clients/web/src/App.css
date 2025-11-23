@@ -1,0 +1,224 @@
+/* 
+   Global Container
+*/
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 
+   Login Screen
+*/
+.login-screen {
+  animation: fadeIn 0.5s ease-in;
+}
+
+.login-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.game-title {
+  font-size: 48px;
+  margin: 0 0 10px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.game-subtitle {
+  color: #666;
+  margin: 0 0 30px 0;
+  font-size: 18px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.username-input {
+  padding: 15px;
+  font-size: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.username-input:focus {
+  border-color: #667eea;
+}
+
+.join-button {
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.join-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+}
+
+.join-button:active {
+  transform: translateY(0);
+}
+
+.error-message {
+  color: #ff4444;
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+.game-instructions {
+  margin-top: 30px;
+  padding-top: 30px;
+  border-top: 2px solid #e0e0e0;
+  text-align: left;
+}
+
+.game-instructions h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.game-instructions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.game-instructions li {
+  padding: 8px 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.game-instructions li:before {
+  content: "✓ ";
+  color: #667eea;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+/* 
+   Loading Screen
+*/
+.loading-screen {
+  animation: fadeIn 0.5s ease-in;
+}
+
+.loading-card {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.loading-card h2 {
+  margin: 20px 0 10px 0;
+  color: #333;
+}
+
+.loading-card p {
+  color: #666;
+  margin: 5px 0;
+}
+
+.player-info {
+  font-size: 18px;
+  margin: 20px 0 10px 0;
+}
+
+.room-info {
+  font-size: 14px;
+  color: #999;
+  font-family: 'Courier New', monospace;
+}
+
+.waiting-hint {
+  margin-top: 30px;
+  padding: 15px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* 
+   Spinner Animation
+    */
+.spinner {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 
+   Animations
+*/
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 
+   Responsive Design
+ */
+@media (max-width: 600px) {
+  .login-card,
+  .loading-card {
+    padding: 30px 20px;
+  }
+
+  .game-title {
+    font-size: 36px;
+  }
+
+  .game-subtitle {
+    font-size: 16px;
+  }
+
+  .username-input,
+  .join-button {
+    font-size: 16px;
+  }
+}
