@@ -1,5 +1,5 @@
-const USER_SERVICE_URL = 'https://localhost:8001';
-const ROOM_SERVICE_URL = 'https://localhost:8002';
+const USER_SERVICE_URL = 'http://localhost:8001';
+const ROOM_SERVICE_URL = 'http://localhost:8002';
 
 // User Service APIs
 export async function registerUser(username: string): Promise<{ user_id: string; username: string }> {
@@ -17,7 +17,10 @@ export async function registerUser(username: string): Promise<{ user_id: string;
     }
 
     const data = await response.json();
-    return data;
+    return {
+      user_id: data.id,
+      username: data.username,
+    };
   } catch (error) {
     console.error('Registration error:', error);
     throw error;
@@ -42,7 +45,10 @@ export async function loginUser(username: string): Promise<{user_id: string; use
     }
 
     const data = await response.json();
-    return data;
+    return {
+      user_id: data.id,
+      username: data.username,
+    };
   } catch (error) {
     console.error('Login error:', error);
     throw error;

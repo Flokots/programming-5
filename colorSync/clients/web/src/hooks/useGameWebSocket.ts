@@ -120,7 +120,7 @@ export function useGameWebSocket(roomId: string, userId: string) {
         }
 
         console.log('Connecting to WebSocket:', roomId, userId);
-        
+
         const ws = new WebSocket(
             `ws://localhost:8003/game/ws?room_id=${roomId}&user_id=${userId}`
         );
@@ -190,30 +190,25 @@ export function useGameWebSocket(roomId: string, userId: string) {
     }, [roomId, userId, handleGameStart, handleRoundStart, handleRoundResult, handleGameOver, handleWrongAnswer, handleError]);
 
     // Send Answer Function
-    const sendAnswer = useCallback((color: StroopColor) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-            console.error('WebSocket not connected');
-            return;
-        }
+    const sendAnswer = (color: StroopColor) => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            console.log('Sending answer:', color);
 
-        if (gameState.status !== 'playing') {
-            console.warn('Cannot send answer, game not in playing state');
-            return;
-        }
-
-        const message: WSMessage = {
-            type: 'CLICK',
-            payload: {
+            const clickPayload: ClickPayload = {
                 answer: color
-            } as ClickPayload,
-        };
+            };
+            const message: WSMessage = {
+                type: 'CLICK',
+                payload: clickPayload
+            };
+            wsRef.current.send(JSON.stringify(message));
+        } else {
+            console.error('Cannot send answer: WebSocket not connected');
+        }
+    };
 
-        console.log('Sending answer:', color);
-        wsRef.current.send(JSON.stringify(message));
-    }, [gameState.status]);
 
     // Return Hook Interface
-
     return {
         gameState,
         sendAnswer,
