@@ -55,7 +55,8 @@ export function useGameWebSocket(roomId: string, userId: string) {
     }, []);
 
     const handleRoundResult = useCallback((payload: RoundResultPayload) => {
-        console.log(`Round ${payload.round} result:`, payload.winner);
+        console.log('Round result - Winner:', payload.winner);
+        console.log('Current user ID:', userId);
 
         setGameState(prev => {
             let newMyScore = prev.myScore;
@@ -63,9 +64,15 @@ export function useGameWebSocket(roomId: string, userId: string) {
 
             if (payload.winner === userId) {
                 newMyScore += 1;
-            } else if (payload.winner && payload.winner !== 'timeout') {
+                console.log('I won this round! New myScore:', newMyScore);
+            } else if (payload.winner !== null && payload.winner !== userId) {
+                // Opponent won this round
                 newOpponentScore += 1;
+                console.log('Opponent won this round. New opponentScore:', newOpponentScore);
+            } else {
+                console.log('Round timed out - no winner');
             }
+
             return {
                 ...prev,
                 myScore: newMyScore,

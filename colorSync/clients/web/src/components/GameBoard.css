@@ -2,11 +2,12 @@
    Game Board Container
 */
 .game-board {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 30px;
 }
 
 /*
@@ -38,21 +39,61 @@
   margin: 10px 0 20px 0;
 }
 
+/*
+   Connection Status
+*/
 .connection-status {
-  margin-top: 20px;
-  padding: 10px;
-  border-radius: 10px;
-  background: #f5f5f5;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
 }
 
-.connection-status .connected {
-  color: #00aa00;
-  font-weight: bold;
+.connection-status.connected {
+  background: rgba(67, 233, 123, 0.1);
+  color: var(--success);
+  border: 2px solid rgba(67, 233, 123, 0.3);
 }
 
-.connection-status .disconnected {
-  color: #ff4444;
-  font-weight: bold;
+.connection-status.disconnected {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--error);
+  border: 2px solid rgba(255, 107, 107, 0.3);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.connected .status-dot {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(67, 233, 123, 0.5);
+}
+
+.disconnected .status-dot {
+  background: var(--error);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 
 /*
@@ -149,6 +190,20 @@
 }
 
 /*
+   Round Info
+*/
+.round-info {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.round-info h2 {
+  color: var(--text-dark);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/*
    Stroop Container
 */
 .stroop-container {
@@ -174,17 +229,58 @@
 }
 
 /*
-   Error Banner
+   Stroop Display
 */
-.error-banner {
-  background: #ff4444;
-  color: white;
-  padding: 15px 30px;
-  border-radius: 10px;
+.stroop-display {
   text-align: center;
+  margin: 40px 0;
+  padding: 40px;
+  background: var(--bg-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.instruction {
+  font-size: 18px;
+  color: var(--text-medium);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+.stroop-word {
+  font-size: 72px;
   font-weight: bold;
-  margin: 20px 0;
-  animation: shake 0.5s;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/*
+   Error Message
+*/
+.error-message {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 2px solid rgba(255, 107, 107, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--error);
+  font-weight: 500;
+  text-align: center;
+  animation: shake 0.5s ease;
 }
 
 @keyframes shake {
@@ -268,28 +364,23 @@
 }
 
 /*
-   Pulse Animation
+   Loading
 */
-.pulse-animation {
-  font-size: 48px;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-medium);
+  font-size: 18px;
 }
 
 /*
    Responsive Design
 */
 @media (max-width: 768px) {
+  .game-board {
+    padding: 20px;
+  }
+
   .answer-buttons {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
@@ -311,6 +402,17 @@
   .stroop-container {
     padding: 40px 20px;
     min-height: 200px;
+  }
+
+  .stroop-word {
+    font-size: 48px;
+  }
+
+  .connection-status {
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+    padding: 6px 12px;
   }
 }
 

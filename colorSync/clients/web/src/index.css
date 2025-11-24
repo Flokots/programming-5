@@ -1,14 +1,50 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  /* Primary colors */
+  --primary: #667eea;
+  --primary-dark: #764ba2;
+  --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* Stroop colors - MUST match backend game logic */
+  --color-red: #ff6b6b;
+  --color-blue: #4facfe;
+  --color-green: #43e97b;
+  --color-yellow: #ffd93d;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  /* Background */
+  --bg-light: #f8f9fa;
+  --bg-white: #ffffff;
+
+  /* Text */
+  --text-dark: #333333;
+  --text-medium: #666666;
+  --text-light: #999999;
+
+  /* Status */
+  --success: #43e97b;
+  --error: #ff6b6b;
+  --warning: #ffd93d;
+
+  /* Shadows */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 10px 25px rgba(102, 126, 234, 0.3);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -20,14 +56,6 @@ a {
 }
 a:hover {
   color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
 }
 
 h1 {
@@ -65,4 +93,55 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* clients/web/src/components/StroopTest.css */
+
+.stroop-test {
+  padding: 30px;
+  background: var(--bg-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.color-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.color-button {
+  padding: 30px 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  border: 4px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ✅ Use CSS variables for consistent colors */
+.color-red {
+  background: linear-gradient(135deg, var(--color-red) 0%, #ee5a6f 100%);
+}
+
+.color-blue {
+  background: linear-gradient(135deg, var(--color-blue) 0%, #00f2fe 100%);
+}
+
+.color-green {
+  background: linear-gradient(135deg, var(--color-green) 0%, #38f9d7 100%);
+}
+
+.color-yellow {
+  background: linear-gradient(135deg, var(--color-yellow) 0%, #fcbf49 100%);
+  color: var(--text-dark);
 }

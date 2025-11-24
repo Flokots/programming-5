@@ -123,16 +123,16 @@
    Score Board
 */
 .score-board {
-  background: white;
+  background: var(--bg-white);
   padding: 25px;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 30px;
 }
 
 .score-board h3 {
   margin: 0 0 20px 0;
-  color: #333;
+  color: var(--text-dark);
   font-size: 20px;
   text-align: center;
   text-transform: uppercase;
@@ -147,18 +147,18 @@
 
 .player-score {
   padding: 20px;
-  background: #f8f9fa;
-  border-radius: 12px;
+  background: var(--bg-light);
+  border-radius: var(--radius-md);
   text-align: center;
   transition: all 0.3s ease;
   border: 3px solid transparent;
 }
 
 .player-score.current {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient);
   color: white;
   transform: scale(1.05);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .player-name {
@@ -170,10 +170,11 @@
 .score {
   font-size: 32px;
   font-weight: bold;
+  animation: scoreUpdate 0.3s ease;
 }
 
 .player-score:not(.current) .score {
-  color: #667eea;
+  color: var(--primary);
 }
 
 .player-score.current .score {
