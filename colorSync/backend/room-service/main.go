@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -27,15 +28,33 @@ var (
 	gameServiceURL = "http://localhost:8003" // Game service endpoint
 )
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Allow requests from React DEV server
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
+	mux := http.NewServeMux()
 	// Register routes
-	http.HandleFunc("/join", joinRoomHandler)
-	http.HandleFunc("/rooms/", getRoomHandler) // trailing slash for /rooms/{id}
-	http.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/join", joinRoomHandler)
+	mux.HandleFunc("/rooms/", getRoomHandler) // trailing slash for /rooms/{id}
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/room/", roomReadyHandler) // Note the trailing slash!
 
 	port := ":8002"
 	fmt.Printf("Room Service starting on port %s\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	handler := corsMiddleware(mux) // Wrap with CORS middleware
+	log.Fatal(http.ListenAndServe(port, handler))
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +89,8 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Validate UserID
 	if req.UserID == "" {
-		http.Error(w, "UserID required", http.StatusBadRequest)
+		log.Printf("ERROR: UserID is empty in join request")
+		http.Error(w, "user_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -204,4 +224,55 @@ func getRoomHandler(w http.ResponseWriter, r *http.Request) {
 		Players: room.Players,
 		Status:  room.Status,
 	})
+}
+
+// Make sure this function exists:
+func roomReadyHandler(w http.ResponseWriter, r *http.Request) {
+	// Only accept GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract room ID from URL path
+	// URL format: /room/{roomID}/ready
+	path := r.URL.Path
+	if !strings.HasPrefix(path, "/room/") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Remove "/room/" prefix
+	remainder := strings.TrimPrefix(path, "/room/")
+
+	// Split by "/" to get roomID and "ready"
+	parts := strings.Split(remainder, "/")
+	if len(parts) != 2 || parts[1] != "ready" {
+		http.Error(w, "Invalid path format", http.StatusBadRequest)
+		return
+	}
+
+	roomID := parts[0]
+
+	// Look up room
+	mu.RLock()
+	room, exists := rooms[roomID]
+	mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "Room not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if room is ready (has 2 players)
+	ready := len(room.Players) == 2
+
+	// Return response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ready":   ready,
+		"players": room.Players,
+	})
+
+	log.Printf("Room %s ready status: %v", roomID, ready)
 }

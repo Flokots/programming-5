@@ -56,7 +56,7 @@ var (
 	gamesMu  sync.RWMutex
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return true // Allow all origins for simplicity; adjust in production
+			return true // Allow websocket from any origin
 		},
 	}
 )
@@ -65,18 +65,37 @@ var (
 var colors = []string{"red", "blue", "green", "yellow"}
 var words = []string{"RED", "BLUE", "GREEN", "YELLOW"}
 
+func corsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        next.ServeHTTP(w, r)
+    })
+}
+
 func main() {
-	http.HandleFunc("/game/start", startGameHandler)
-	http.HandleFunc("/game/ws", wsHandler)
-	http.HandleFunc("/game/status", gameStatusHandler) // ← ADD THIS
-	http.HandleFunc("/health", healthHandler)
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/game/start", startGameHandler)
+	mux.HandleFunc("/game/ws", wsHandler)
+	mux.HandleFunc("/game/status", gameStatusHandler)
+	mux.HandleFunc("/health", healthHandler)
+
+	handler := corsMiddleware(mux)
 
 	port := ":8003"
 	fmt.Printf("Game Rules Service running on port %s\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Fatal(http.ListenAndServe(port, handler))
 }
 
-// NEW: Check if game exists
+// Check if game exists
 func gameStatusHandler(w http.ResponseWriter, r *http.Request) {
 	roomID := r.URL.Query().Get("room_id")
 	if roomID == "" {

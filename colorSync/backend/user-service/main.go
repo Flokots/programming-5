@@ -25,16 +25,37 @@ var (
 	mu          sync.RWMutex             //Mutex for thread-safe access
 )
 
-func main() {
-	// Register routes
-	http.HandleFunc("/register", registerHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/users/", getUserHandler) // trailing slash for /users/{id}
-	http.HandleFunc("/health", healthHandler)
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Allow requests from React DEV server
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func main() {
+	// Create a new ServerMux(router)
+	mux := http.NewServeMux()
+
+
+	// Register routes
+	mux.HandleFunc("/register", registerHandler)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/users/", getUserHandler) // trailing slash for /users/{id}
+	mux.HandleFunc("/health", healthHandler)
+
+	handler := corsMiddleware(mux) // Wrap with CORS middleware
+	
 	port := ":8001"
 	fmt.Printf("User Service starting on port %s\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Fatal(http.ListenAndServe(port, handler))
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
