@@ -48,3 +48,47 @@ export async function loginUser(username: string): Promise<{user_id: string; use
     throw error;
   }
 }
+
+// Room Service APIs
+export async function joinMatchmaking(userId: string): Promise<{ room_id: string; players: string[]; status: string; message: string }> {
+  try {
+    const payload = { user_id: userId };
+    console.log("Send join request:", payload);
+
+    const response = await fetch(`${ROOM_SERVICE_URL}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Join room failed:', response.status, errorText);
+      throw new Error(`Failed to join room: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Join room response:', data);
+    return data;
+  } catch (error) {
+    console.error('Join room error:', error);
+    throw error;
+  }
+}
+
+export async function isRoomReady(roomId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${ROOM_SERVICE_URL}/room/${roomId}/ready`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to check room readiness: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.ready;
+  } catch (error) {
+    console.error('Check room readiness error:', error);
+    throw error;
+  }
+}
