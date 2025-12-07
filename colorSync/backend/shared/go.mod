@@ -1,4 +1,4 @@
-module github.com/Flokots/colorSync/shared
+module github.com/Flokots/programming-5/colorSync/shared
 
 go 1.25.4
 
