@@ -148,12 +148,42 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock() // Unlock when function exits
 
+	// Check if user is already in the waiting room
+    if waitingRoomID != nil {
+        waitingRoom := rooms[*waitingRoomID]
+        for _, playerID := range waitingRoom.Players {
+            if playerID == req.UserID {
+                log.Printf("User %s already in waiting room %s", req.UserID, *waitingRoomID)
+                http.Error(w, "You are already in matchmaking queue", http.StatusConflict)
+                return
+            }
+        }
+    }
+
+	// Check if user is already in any room
+    for _, room := range rooms {
+        for _, playerID := range room.Players {
+            if playerID == req.UserID {
+                log.Printf("⚠️ User %s already in room %s", req.UserID, room.ID)
+                http.Error(w, "You are already in an active room", http.StatusConflict)
+                return
+            }
+        }
+    }
+
 	var room *Room
 
 	// Check if there's a waiting room
 	if waitingRoomID != nil {
 		// Join existing room
 		room = rooms[*waitingRoomID]
+
+		// Double-check players are different
+        if len(room.Players) > 0 && room.Players[0] == req.UserID {
+            log.Printf("ERROR: Same user attempting to join twice: %s", req.UserID)
+            http.Error(w, "Cannot match with yourself", http.StatusConflict)
+            return
+        }
 		room.Players = append(room.Players, req.UserID)
 		room.Status = "full"
 		waitingRoomID = nil // No longer waiting

@@ -186,21 +186,50 @@ func (a *APIClient) joinRoom(userID string) (string, error) {
 	return result.RoomID, nil
 }
 
-// Check if game is ready for a room
+// STEP 1: Check if ROOM is full (has 2 players)
+func (a *APIClient) checkRoomFull(roomID string) (bool, error) {
+    url := fmt.Sprintf("%s/room/%s/ready", a.roomServiceURL, roomID)
+
+    resp, err := a.httpClient.Get(url)
+    if err != nil {
+        return false, err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return false, nil
+    }
+
+    var result struct {
+        Ready   bool     `json:"ready"`
+        Players []string `json:"players"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return false, err
+    }
+
+    return result.Ready, nil
+}
+
+// STEP 2: Check if GAME is ready (exists)
 func (a *APIClient) checkGameReady(roomID string) (bool, error) {
-	resp, err := a.httpClient.Get(
-		fmt.Sprintf("http://localhost:8003/game/status?room_id=%s", roomID),
-	)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
+    url := fmt.Sprintf("http://localhost:8003/game/status?room_id=%s", roomID)
 
-	// If game exists and is waiting for players, it's ready
-	if resp.StatusCode == http.StatusOK {
-		return true, nil
-	}
+    resp, err := a.httpClient.Get(url)
+    if err != nil {
+        return false, err
+    }
+    defer resp.Body.Close()
 
-	// Game doesn't exist yet
-	return false, nil
+    if resp.StatusCode == http.StatusNotFound {
+        return false, nil
+    }
+    if resp.StatusCode != http.StatusOK {
+        // Read body for logging/debug
+        bodyBytes, _ := io.ReadAll(resp.Body)
+        return false, fmt.Errorf("unexpected status checking game: %d %s", resp.StatusCode, string(bodyBytes))
+    }
+
+    // We only care that the game exists (200 OK). Status may be "waiting_for_players" until sockets connect.
+    return true, nil
 }

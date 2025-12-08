@@ -17,17 +17,10 @@ func main() {
 	username := flag.String("username", "", "Your username (optional - will prompt if not provided)")
 	flag.Parse()
 
-	// If username not provided via flag, prompt the user for it
-	var finalUsername string
-	if *username == "" {
-		finalUsername = promptForUsername()
-	} else {
-		finalUsername = *username
-	}
+	// Create client instance
+	client := newClient(*username)
 
-	// Create and run client
-	client := newClient(finalUsername)
-
+	// Run client
 	if err := client.Run(); err != nil {
 		log.Fatalf("Client error: %v", err)
 	}
