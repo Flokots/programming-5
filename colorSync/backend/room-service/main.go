@@ -23,6 +23,10 @@ type Room struct {
 	Status  string   `json:"status"`  // e.g., "waiting", or "full"
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 // In-memory storage
 var (
 	rooms          = make(map[string]*Room)  //roomID -> Room
@@ -61,11 +65,11 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Protect /join with JWT authentication
+	// Protect routes with JWT authentication
 	mux.HandleFunc("/join", middleware.RequireAuth(joinRoomHandler))
+	mux.HandleFunc("/rooms/", middleware.RequireAuth(roomsRouter))
 
-	// Register routes
-	mux.HandleFunc("/rooms/", getRoomHandler) // trailing slash for /rooms/{id}
+	// Public routes
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/room/", roomReadyHandler) // Note the trailing slash!
 
@@ -73,13 +77,35 @@ func main() {
 	fmt.Printf("Room Service starting on port %s\n", port)
 	fmt.Printf("Endpoints:\n")
 	fmt.Printf("POST /join         - Join matchmaking (requires JWT)\n")
-	fmt.Printf("GET  /rooms/:id    - Get room info (public)\n")
+	fmt.Printf("GET  /rooms/:id    - Get room info (requires JWT)\n")
+	fmt.Printf("POST /rooms/:id/leave - Leave room (requires JWT)\n")
 	fmt.Printf("GET  /room/:id/ready - Check room status (public)\n")
 	fmt.Printf("GET  /health       - Health check (public)\n")
 	fmt.Printf("\n")
 
 	handler := corsMiddleware(mux) // Wrap with CORS middleware
 	log.Fatal(http.ListenAndServe(port, handler))
+}
+
+// Router for /rooms/* paths - middleware has already validated JWT
+func roomsRouter(w http.ResponseWriter, r *http.Request) {
+	// Extract path after /rooms/
+	path := strings.TrimPrefix(r.URL.Path, "/rooms/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 2 && parts[1] == "leave" && r.Method == http.MethodPost {
+		// POST /rooms/:id/leave
+		leaveRoomHandler(w, r)
+		return
+	}
+
+	if len(parts) == 1 && r.Method == http.MethodGet {
+		// GET /rooms/:id
+		getRoomHandler(w, r)
+		return
+	}
+
+	http.Error(w, "Not found", http.StatusNotFound)
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -149,27 +175,27 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock() // Unlock when function exits
 
 	// Check if user is already in the waiting room
-    if waitingRoomID != nil {
-        waitingRoom := rooms[*waitingRoomID]
-        for _, playerID := range waitingRoom.Players {
-            if playerID == req.UserID {
-                log.Printf("User %s already in waiting room %s", req.UserID, *waitingRoomID)
-                http.Error(w, "You are already in matchmaking queue", http.StatusConflict)
-                return
-            }
-        }
-    }
+	if waitingRoomID != nil {
+		waitingRoom := rooms[*waitingRoomID]
+		for _, playerID := range waitingRoom.Players {
+			if playerID == req.UserID {
+				log.Printf("User %s already in waiting room %s", req.UserID, *waitingRoomID)
+				http.Error(w, "You are already in matchmaking queue", http.StatusConflict)
+				return
+			}
+		}
+	}
 
 	// Check if user is already in any room
-    for _, room := range rooms {
-        for _, playerID := range room.Players {
-            if playerID == req.UserID {
-                log.Printf("⚠️ User %s already in room %s", req.UserID, room.ID)
-                http.Error(w, "You are already in an active room", http.StatusConflict)
-                return
-            }
-        }
-    }
+	for _, room := range rooms {
+		for _, playerID := range room.Players {
+			if playerID == req.UserID {
+				log.Printf("⚠️ User %s already in room %s", req.UserID, room.ID)
+				http.Error(w, "You are already in an active room", http.StatusConflict)
+				return
+			}
+		}
+	}
 
 	var room *Room
 
@@ -179,11 +205,11 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 		room = rooms[*waitingRoomID]
 
 		// Double-check players are different
-        if len(room.Players) > 0 && room.Players[0] == req.UserID {
-            log.Printf("ERROR: Same user attempting to join twice: %s", req.UserID)
-            http.Error(w, "Cannot match with yourself", http.StatusConflict)
-            return
-        }
+		if len(room.Players) > 0 && room.Players[0] == req.UserID {
+			log.Printf("ERROR: Same user attempting to join twice: %s", req.UserID)
+			http.Error(w, "Cannot match with yourself", http.StatusConflict)
+			return
+		}
 		room.Players = append(room.Players, req.UserID)
 		room.Status = "full"
 		waitingRoomID = nil // No longer waiting
@@ -363,4 +389,85 @@ func roomReadyHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	log.Printf("Room %s ready status: %v", roomID, ready)
+}
+
+// LeaveRoomHandler - use middleware claims like joinRoomHandler
+func leaveRoomHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract room ID from URL: /rooms/{roomID}/leave
+	path := strings.TrimPrefix(r.URL.Path, "/rooms/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 || parts[1] != "leave" {
+		http.Error(w, "Invalid path", http.StatusNotFound)
+		return
+	}
+	roomID := parts[0]
+
+	// Get user claims from JWT token (validated by middleware)
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "Unauthorized - no user claims", http.StatusUnauthorized)
+		return
+	}
+	userID := claims.UserID
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	room, exists := rooms[roomID]
+	if !exists {
+		respondJSON(w, http.StatusNotFound, ErrorResponse{
+			Error: "Room not found",
+		})
+		return
+	}
+
+	// Remove user from room
+	newPlayers := []string{}
+	for _, playerID := range room.Players {
+		if playerID != userID {
+			newPlayers = append(newPlayers, playerID)
+		}
+	}
+	room.Players = newPlayers
+
+	// Update room status based on remaining players
+	switch len(room.Players) {
+	case 0:
+		// No players left - delete room
+		delete(rooms, roomID)
+		// Clear waitingRoomID if this was the waiting room
+		if waitingRoomID != nil && *waitingRoomID == roomID {
+			waitingRoomID = nil
+		}
+		log.Printf("Room %s deleted (no players remaining)", roomID)
+		respondJSON(w, http.StatusOK, map[string]string{
+			"message": "Left room; room deleted",
+		})
+		return
+	case 1:
+		// One player left - mark as waiting
+		room.Status = "waiting"
+		// Create pointer to room's ID (not local variable)
+		rid := room.ID
+		waitingRoomID = &rid
+		log.Printf("User %s left room %s (1 player remaining, marked as waiting)", userID, roomID)
+	default:
+		// Shouldn't happen after game ends, but keep room as-is
+		log.Printf("User %s left room %s (%d players remaining)", userID, roomID, len(room.Players))
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Left room successfully",
+		"room_id": roomID,
+		"players": room.Players,
+	})
+}
+
+// Helper to send JSON responses
+func respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
 }
