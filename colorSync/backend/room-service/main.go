@@ -8,8 +8,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/Flokots/programming-5/colorSync/shared/auth"
+    "github.com/Flokots/programming-5/colorSync/shared/middleware"
 )
 
 // Room represents a game room
@@ -28,6 +32,9 @@ var (
 	gameServiceURL = "http://localhost:8003" // Game service endpoint
 )
 
+// Service token for Zero Trust communication
+var gameServiceToken string
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Allow requests from React DEV server
@@ -44,20 +51,39 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	mux := http.NewServeMux()
+ 	// Generate service token for Game Service communication (Zero Trust)
+	var err error
+    gameServiceToken, err = auth.GenerateServiceToken("room-service")
+	if err != nil {
+        log.Fatalf("Failed to generate service token: %v", err)
+    }
+    log.Printf("Service token generated for Game Service communication")
+
+    mux := http.NewServeMux()
+
+	// Protect /join with JWT authentication
+    mux.HandleFunc("/join", middleware.RequireAuth(joinRoomHandler))
+
 	// Register routes
-	mux.HandleFunc("/join", joinRoomHandler)
 	mux.HandleFunc("/rooms/", getRoomHandler) // trailing slash for /rooms/{id}
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/room/", roomReadyHandler) // Note the trailing slash!
 
 	port := ":8002"
 	fmt.Printf("Room Service starting on port %s\n", port)
+	fmt.Printf("Endpoints:\n")
+    fmt.Printf("POST /join         - Join matchmaking (requires JWT)\n")
+    fmt.Printf("GET  /rooms/:id    - Get room info (public)\n")
+    fmt.Printf("GET  /room/:id/ready - Check room status (public)\n")
+    fmt.Printf("GET  /health       - Health check (public)\n")
+    fmt.Printf("\n")
+
 	handler := corsMiddleware(mux) // Wrap with CORS middleware
 	log.Fatal(http.ListenAndServe(port, handler))
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 }
@@ -73,6 +99,7 @@ type JoinResponse struct {
 	Message string   `json:"message"`
 }
 
+// Use JWT authentication from middleware
 func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Only accept POST requests
 	if r.Method != http.MethodPost {
@@ -80,27 +107,45 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Parse request body
+	// 2. Get user claims from JWT token (validated by middleware)
+    claims := middleware.GetUserClaims(r)
+    if claims == nil {
+        http.Error(w, "Unauthorized - no user claims", http.StatusUnauthorized)
+        return
+    }
+
+	// 3. Parse request body
 	var req JoinRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Validate UserID
+	// 4. Validate UserID
 	if req.UserID == "" {
 		log.Printf("ERROR: UserID is empty in join request")
 		http.Error(w, "user_id is required", http.StatusBadRequest)
 		return
 	}
 
-	// 4. Verify user exists by calling User Service
+	// 5. Verify user_id matches JWT token (security check)
+    if req.UserID != claims.UserID {
+        log.Printf("User %s (%s) attempted to join as %s", 
+            claims.Username, claims.UserID, req.UserID)
+        http.Error(w, "User ID mismatch - cannot join as another user", http.StatusForbidden)
+        return
+    }
+
+    log.Printf("User %s (%s) joining matchmaking", claims.Username, req.UserID)
+
+
+	// 6. Verify user exists by calling User Service
 	if !verifyUser(req.UserID) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// Find or create room (thread-safe)
+	// 7. Find or create room (thread-safe)
 	mu.Lock()
 	defer mu.Unlock() // Unlock when function exits
 
@@ -161,7 +206,8 @@ func verifyUser(userID string) bool {
 	return true
 }
 
-// notifyGameService notifies Game Service to start the game
+// notifyGameService notifies Game Service to start the game, 
+// sends service token for zero trust auth
 func notifyGameService(roomID string, players []string) {
 	url := fmt.Sprintf("%s/game/start", gameServiceURL)
 
@@ -172,9 +218,22 @@ func notifyGameService(roomID string, players []string) {
 
 	jsonData, _ := json.Marshal(payload)
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	// Create request with service token
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error creating request to Game Service: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	//Add service token for Zero Trust
+	req.Header.Set("X-Service-Token", gameServiceToken)
+
+	// Send request
+	client := &http.Client{Timeout: 10 * time.Second}
+    resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Error calling Game Service: %v", err)
+		return
 	}
 	defer resp.Body.Close()
 
