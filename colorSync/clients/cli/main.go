@@ -7,6 +7,9 @@ import (
 	"log"
 	"os"
 	"strings"
+	"syscall"
+
+	"golang.org/x/term"
 )
 
 func main() {
@@ -46,4 +49,24 @@ func promptForUsername() string {
 		os.Exit(1)
 	}
 	return username
+}
+
+// Function for password input (hidden)
+func promptForPassword() string {
+	// Read password without echoing to terminal
+	passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		log.Fatalf("Failed to read password: %v", err)
+	}
+	fmt.Println() // New line after password input
+
+	password := strings.TrimSpace(string(passwordBytes))
+
+	// Validate password
+	if len(password) < 6 {
+		fmt.Println("Password must be at least 6 characters")
+		os.Exit(1)
+	}
+
+	return password
 }

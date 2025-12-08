@@ -11,25 +11,25 @@ import (
 // UI handles terminal display
 type UI struct {
 	// Color functions for terminal output
-	red   *color.Color
-	blue   *color.Color
-	green  *color.Color
-	yellow *color.Color
-	cyan   *color.Color
+	red     *color.Color
+	blue    *color.Color
+	green   *color.Color
+	yellow  *color.Color
+	cyan    *color.Color
 	magenta *color.Color
-	bold   *color.Color
+	bold    *color.Color
 }
 
 // constructor to create color objects we can call .Println() on
 func newUI() *UI {
 	return &UI{
-		red:    color.New(color.FgRed),
-		blue:   color.New(color.FgBlue),
-		green:  color.New(color.FgGreen),
-		yellow: color.New(color.FgYellow),
-		cyan:   color.New(color.FgCyan),
+		red:     color.New(color.FgRed),
+		blue:    color.New(color.FgBlue),
+		green:   color.New(color.FgGreen),
+		yellow:  color.New(color.FgYellow),
+		cyan:    color.New(color.FgCyan),
 		magenta: color.New(color.FgMagenta),
-		bold:   color.New(color.Bold),
+		bold:    color.New(color.Bold),
 	}
 }
 
@@ -73,7 +73,7 @@ func (ui *UI) showRound(round int, word string, textColor string) {
 	ui.cyan.Printf("What COLOR is this text? → ")
 
 	switch textColor {
-	case "red": 
+	case "red":
 		ui.red.Println(word)
 	case "blue":
 		ui.blue.Println(word)
@@ -113,10 +113,10 @@ func (ui *UI) showGameOver(winner string, myUserID string, wins, opponentWins in
 
 	// Determine result from winner
 	switch winner {
-case "draw":
+	case "draw":
 		ui.yellow.Println("  🤝 It's a DRAW!")
 	case myUserID:
-	ui.green.Println("  🎉 YOU WON! 🎉")
+		ui.green.Println("  🎉 YOU WON! 🎉")
 	default:
 		ui.red.Println("  😞 YOU LOST. 😞")
 	}
