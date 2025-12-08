@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-    "golang.org/x/crypto/bcrypt"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Flokots/programming-5/colorSync/shared/auth"
 )
@@ -18,7 +18,7 @@ import (
 type User struct {
 	ID        string    `json:"id"`
 	Username  string    `json:"username"`
-	Password  string    `json:"-"`   // Hashed password
+	Password  string    `json:"-"` // Hashed password
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -55,15 +55,15 @@ func main() {
 	mux.HandleFunc("/health", healthHandler)
 
 	handler := corsMiddleware(mux) // Wrap with CORS middleware
-	
+
 	port := ":8001"
 	fmt.Printf("User Service starting on port %s\n", port)
 	fmt.Printf("Endpoints:\n")
-    fmt.Printf("   POST /register - Create new user (username + password)\n")
-    fmt.Printf("   POST /login    - Authenticate user (returns JWT token)\n")
-    fmt.Printf("   GET  /users/:id - Get user info\n")
-    fmt.Printf("   GET  /health   - Health check\n")
-    fmt.Printf("\n")
+	fmt.Printf("   POST /register - Create new user (username + password)\n")
+	fmt.Printf("   POST /login    - Authenticate user (returns JWT token)\n")
+	fmt.Printf("   GET  /users/:id - Get user info\n")
+	fmt.Printf("   GET  /health   - Health check\n")
+	fmt.Printf("\n")
 	log.Fatal(http.ListenAndServe(port, handler))
 }
 
@@ -75,8 +75,8 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":     "healthy",
-		"service":    "user-service",
+		"status":      "healthy",
+		"service":     "user-service",
 		"users_count": userCount, // show user count
 	})
 }
@@ -87,11 +87,11 @@ type RegisterRequest struct {
 }
 
 type RegisterResponse struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Token     string    `json:"token"` 
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	Token     string    `json:"token"`
 	CreatedAt time.Time `json:"created_at"`
-	Message  string `json:"message"`
+	Message   string    `json:"message"`
 }
 
 // registerHandler creates a new user with hashed password and returns a JWT token
@@ -117,20 +117,20 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 4. Validate username length
 	if len(req.Username) < 3 {
-        http.Error(w, "Username must be at least 3 characters", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "Username must be at least 3 characters", http.StatusBadRequest)
+		return
+	}
 
 	// 5. Validate password
 	if req.Password == "" {
-        http.Error(w, "Password required", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "Password required", http.StatusBadRequest)
+		return
+	}
 
 	if len(req.Password) < 6 {
-        http.Error(w, "Password must be at least 6 characters", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "Password must be at least 6 characters", http.StatusBadRequest)
+		return
+	}
 
 	// 6. Check if username already exists (thread-safe read)
 	mu.RLock()
@@ -144,14 +144,14 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 7. Hash password using bcrypt
 	hashedPassword, err := bcrypt.GenerateFromPassword(
-        []byte(req.Password),
-        bcrypt.DefaultCost, // Cost factor 10
-    )
-    if err != nil {
-        log.Printf("Failed to hash password: %v", err)
-        http.Error(w, "Failed to create user", http.StatusInternalServerError)
-        return
-    }
+		[]byte(req.Password),
+		bcrypt.DefaultCost, // Cost factor 10
+	)
+	if err != nil {
+		log.Printf("Failed to hash password: %v", err)
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
 
 	// 8. Create new user
 	user := &User{
@@ -169,24 +169,24 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 10. Generate JWT token
 	token, err := auth.GenerateUserToken(user.ID, user.Username)
-    if err != nil {
-        log.Printf("Failed to generate token: %v", err)
-        http.Error(w, "User created but failed to generate token", http.StatusInternalServerError)
-        return
-    }
+	if err != nil {
+		log.Printf("Failed to generate token: %v", err)
+		http.Error(w, "User created but failed to generate token", http.StatusInternalServerError)
+		return
+	}
 
 	log.Printf("User registered: %s (ID: %s)", user.Username, user.ID)
-    log.Printf("JWT token generated for: %s", user.Username)
+	log.Printf("JWT token generated for: %s", user.Username)
 
 	// 11. Send success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(RegisterResponse{
-		ID:       user.ID,
-		Username: user.Username,
+		ID:        user.ID,
+		Username:  user.Username,
 		Token:     token,
-        CreatedAt: user.CreatedAt,
-		Message:  "User registered successfully",
+		CreatedAt: user.CreatedAt,
+		Message:   "User registered successfully",
 	})
 
 	log.Printf("Registered new user: %s (ID: %s)", user.Username, user.ID)
@@ -244,11 +244,11 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
 	Token     string    `json:"token"`
-    CreatedAt time.Time `json:"created_at"`
-	Message  string `json:"message"`
+	CreatedAt time.Time `json:"created_at"`
+	Message   string    `json:"message"`
 }
 
 // loginHandler authenticates user and returns JWT token
@@ -268,9 +268,9 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Validate username
 	if req.Username == "" || req.Password == "" {
-        http.Error(w, "Username and password required", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "Username and password required", http.StatusBadRequest)
+		return
+	}
 
 	// 4. Check if user exists (thread-safe read)
 	mu.RLock()
@@ -278,43 +278,43 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	mu.RUnlock()
 
 	if !exists {
-        // Use generic error to prevent username enumeration
-        log.Printf("Login attempt for non-existent user: %s", req.Username)
-        http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-        return
-    }
+		// Use generic error to prevent username enumeration
+		log.Printf("Login attempt for non-existent user: %s", req.Username)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
 
 	// 5. Verify password using bcrypt
 	err := bcrypt.CompareHashAndPassword(
-        []byte(user.Password), // Hashed password from storage
-        []byte(req.Password),  // Plain text password from request
-    )
-    if err != nil {
-        // Wrong password - use same generic error
-        log.Printf("Failed login attempt for user: %s (wrong password)", req.Username)
-        http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-        return
-    }
+		[]byte(user.Password), // Hashed password from storage
+		[]byte(req.Password),  // Plain text password from request
+	)
+	if err != nil {
+		// Wrong password - use same generic error
+		log.Printf("Failed login attempt for user: %s (wrong password)", req.Username)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
 
 	// 6. Generate JWT token
-    token, err := auth.GenerateUserToken(user.ID, user.Username)
-    if err != nil {
-        log.Printf("Failed to generate token: %v", err)
-        http.Error(w, "Login successful but failed to generate token", http.StatusInternalServerError)
-        return
-    }
+	token, err := auth.GenerateUserToken(user.ID, user.Username)
+	if err != nil {
+		log.Printf("Failed to generate token: %v", err)
+		http.Error(w, "Login successful but failed to generate token", http.StatusInternalServerError)
+		return
+	}
 
 	log.Printf("User logged in: %s (ID: %s)", user.Username, user.ID)
-    log.Printf("JWT token generated for: %s", user.Username)
+	log.Printf("JWT token generated for: %s", user.Username)
 
 	// 6. Return user info (successful login) with JWT token
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(LoginResponse{
-		ID:       user.ID,
-		Username: user.Username,
+		ID:        user.ID,
+		Username:  user.Username,
 		Token:     token,
 		CreatedAt: user.CreatedAt,
-		Message:  "Login successful",
+		Message:   "Login successful",
 	})
 }

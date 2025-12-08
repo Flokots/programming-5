@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/Flokots/programming-5/colorSync/shared/middleware"
 )
 
 // Game represents an active game session
@@ -61,29 +63,25 @@ var (
 	}
 )
 
-// Stroop colors and words
-var colors = []string{"red", "blue", "green", "yellow"}
-var words = []string{"RED", "BLUE", "GREEN", "YELLOW"}
-
 func corsMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Access-Control-Allow-Origin", "*")
-        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-        if r.Method == "OPTIONS" {
-            w.WriteHeader(http.StatusOK)
-            return
-        }
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
-        next.ServeHTTP(w, r)
-    })
+		next.ServeHTTP(w, r)
+	})
 }
 
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/game/start", startGameHandler)
+	mux.HandleFunc("/game/start", middleware.RequireServiceAuth(startGameHandler))
 	mux.HandleFunc("/game/ws", wsHandler)
 	mux.HandleFunc("/game/status", gameStatusHandler)
 	mux.HandleFunc("/health", healthHandler)
@@ -136,6 +134,8 @@ type StartGameResponse struct {
 }
 
 func startGameHandler(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetServiceClaims(r)
+	log.Printf("Game start request from: %s", claims.ServiceName)
 	// Only accept POST requests
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

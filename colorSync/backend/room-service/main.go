@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Flokots/programming-5/colorSync/shared/auth"
-    "github.com/Flokots/programming-5/colorSync/shared/middleware"
+	"github.com/Flokots/programming-5/colorSync/shared/middleware"
 )
 
 // Room represents a game room
@@ -51,18 +51,18 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
- 	// Generate service token for Game Service communication (Zero Trust)
+	// Generate service token for Game Service communication (Zero Trust)
 	var err error
-    gameServiceToken, err = auth.GenerateServiceToken("room-service")
+	gameServiceToken, err = auth.GenerateServiceToken("room-service")
 	if err != nil {
-        log.Fatalf("Failed to generate service token: %v", err)
-    }
-    log.Printf("Service token generated for Game Service communication")
+		log.Fatalf("Failed to generate service token: %v", err)
+	}
+	log.Printf("Service token generated for Game Service communication")
 
-    mux := http.NewServeMux()
+	mux := http.NewServeMux()
 
 	// Protect /join with JWT authentication
-    mux.HandleFunc("/join", middleware.RequireAuth(joinRoomHandler))
+	mux.HandleFunc("/join", middleware.RequireAuth(joinRoomHandler))
 
 	// Register routes
 	mux.HandleFunc("/rooms/", getRoomHandler) // trailing slash for /rooms/{id}
@@ -72,11 +72,11 @@ func main() {
 	port := ":8002"
 	fmt.Printf("Room Service starting on port %s\n", port)
 	fmt.Printf("Endpoints:\n")
-    fmt.Printf("POST /join         - Join matchmaking (requires JWT)\n")
-    fmt.Printf("GET  /rooms/:id    - Get room info (public)\n")
-    fmt.Printf("GET  /room/:id/ready - Check room status (public)\n")
-    fmt.Printf("GET  /health       - Health check (public)\n")
-    fmt.Printf("\n")
+	fmt.Printf("POST /join         - Join matchmaking (requires JWT)\n")
+	fmt.Printf("GET  /rooms/:id    - Get room info (public)\n")
+	fmt.Printf("GET  /room/:id/ready - Check room status (public)\n")
+	fmt.Printf("GET  /health       - Health check (public)\n")
+	fmt.Printf("\n")
 
 	handler := corsMiddleware(mux) // Wrap with CORS middleware
 	log.Fatal(http.ListenAndServe(port, handler))
@@ -108,11 +108,11 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Get user claims from JWT token (validated by middleware)
-    claims := middleware.GetUserClaims(r)
-    if claims == nil {
-        http.Error(w, "Unauthorized - no user claims", http.StatusUnauthorized)
-        return
-    }
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "Unauthorized - no user claims", http.StatusUnauthorized)
+		return
+	}
 
 	// 3. Parse request body
 	var req JoinRequest
@@ -129,15 +129,14 @@ func joinRoomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Verify user_id matches JWT token (security check)
-    if req.UserID != claims.UserID {
-        log.Printf("User %s (%s) attempted to join as %s", 
-            claims.Username, claims.UserID, req.UserID)
-        http.Error(w, "User ID mismatch - cannot join as another user", http.StatusForbidden)
-        return
-    }
+	if req.UserID != claims.UserID {
+		log.Printf("User %s (%s) attempted to join as %s",
+			claims.Username, claims.UserID, req.UserID)
+		http.Error(w, "User ID mismatch - cannot join as another user", http.StatusForbidden)
+		return
+	}
 
-    log.Printf("User %s (%s) joining matchmaking", claims.Username, req.UserID)
-
+	log.Printf("User %s (%s) joining matchmaking", claims.Username, req.UserID)
 
 	// 6. Verify user exists by calling User Service
 	if !verifyUser(req.UserID) {
@@ -206,7 +205,7 @@ func verifyUser(userID string) bool {
 	return true
 }
 
-// notifyGameService notifies Game Service to start the game, 
+// notifyGameService notifies Game Service to start the game,
 // sends service token for zero trust auth
 func notifyGameService(roomID string, players []string) {
 	url := fmt.Sprintf("%s/game/start", gameServiceURL)
@@ -230,7 +229,7 @@ func notifyGameService(roomID string, players []string) {
 
 	// Send request
 	client := &http.Client{Timeout: 10 * time.Second}
-    resp, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Error calling Game Service: %v", err)
 		return

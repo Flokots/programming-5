@@ -2,6 +2,11 @@ module github.com/Flokots/programming-5/colorSync/game-rules-service
 
 go 1.25.4
 
-require github.com/gorilla/websocket v1.5.3
+require (
+	github.com/Flokots/programming-5/colorSync/shared v0.0.0-00010101000000-000000000000
+	github.com/gorilla/websocket v1.5.3
+)
+
+require github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 
 replace github.com/Flokots/programming-5/colorSync/shared => ../shared
