@@ -29,12 +29,17 @@ func newClient(username string) *Client {
 func (c *Client) Run() error {
 	c.ui.showWelcome()
 
-	// Login/Register
-	fmt.Println("Registering user...")
-	userID, err := c.apiClient.login(c.username)
+	// Prompt for password
+    fmt.Print("Enter password: ")
+    password := promptForPassword()
+
+	// Try login first (with password)
+	fmt.Println("Logging in user...")
+	userID, err := c.apiClient.login(c.username, password)
 	if err != nil {
+		// If login fails, try registration
 		fmt.Println("User not found, registering...")
-		userID, err = c.apiClient.register(c.username)
+		userID, err = c.apiClient.register(c.username, password) // Pass password for registration
 		if err != nil {
 			return fmt.Errorf("registration failed: %w", err)
 		}
