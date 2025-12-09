@@ -1,100 +1,199 @@
-const USER_SERVICE_URL = 'http://localhost:8001';
-const ROOM_SERVICE_URL = 'http://localhost:8002';
+// API Client - Mirrors CLI's api_client.go
 
-// User Service APIs
-export async function registerUser(username: string): Promise<{ user_id: string; username: string }> {
-  try {
-    const response = await fetch(`${USER_SERVICE_URL}/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Registration failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return {
-      user_id: data.id,
-      username: data.username,
-    };
-  } catch (error) {
-    console.error('Registration error:', error);
-    throw error;
-  }
+// ============================================
+// RESPONSE TYPES (Backend Contract)
+// ============================================
+interface BackendAuthResponse {
+  id?: string;        // Backend might return 'id'
+  user_id?: string;   // Or 'user_id'
+  token: string;
+  username: string;
 }
 
-export async function loginUser(username: string): Promise<{user_id: string; username: string }> {
-  try {
-    const response = await fetch(`${USER_SERVICE_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('User not found');
-      }
-      throw new Error(`Login failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return {
-      user_id: data.id,
-      username: data.username,
-    };
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
+// ============================================
+// NORMALIZED TYPES (Frontend Use)
+// ============================================
+export interface AuthResponse {
+  user_id: string;
+  token: string;
+  username: string;
 }
 
-// Room Service APIs
-export async function joinMatchmaking(userId: string): Promise<{ room_id: string; players: string[]; status: string; message: string }> {
-  try {
-    const payload = { user_id: userId };
-    console.log("Send join request:", payload);
+export class APIClient {
+  private userServiceURL = 'http://localhost:8001';
+  private roomServiceURL = 'http://localhost:8002';
+  private gameServiceURL = 'http://localhost:8003';
+  
+  private token: string | null = null;
+  private username: string | null = null;
+  private userID: string | null = null;
 
-    const response = await fetch(`${ROOM_SERVICE_URL}/join`, {
+  // ============================================
+  // AUTHENTICATION (User Service)
+  // ============================================
+
+  async login(username: string, password: string): Promise<AuthResponse> {
+    const response = await fetch(`${this.userServiceURL}/login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Join room failed:', response.status, errorText);
-      throw new Error(`Failed to join room: ${response.statusText}`);
+      const error = await response.text();
+      throw new Error(`Login failed: ${error}`);
     }
 
-    const data = await response.json();
-    console.log('Join room response:', data);
+    const rawData: BackendAuthResponse = await response.json();
+    
+    // Normalize the response - backend might use 'id' or 'user_id'
+    const data: AuthResponse = {
+      user_id: rawData.user_id || rawData.id || '',
+      token: rawData.token,
+      username: rawData.username,
+    };
+
+    if (!data.user_id) {
+      throw new Error('Backend did not return user ID');
+    }
+
+    this.token = data.token;
+    this.username = data.username;
+    this.userID = data.user_id;
+    
+    console.log(`✅ Logged in as: ${data.username} (ID: ${data.user_id})`);
     return data;
-  } catch (error) {
-    console.error('Join room error:', error);
-    throw error;
   }
-}
 
-export async function isRoomReady(roomId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${ROOM_SERVICE_URL}/room/${roomId}/ready`);
+  async register(username: string, password: string): Promise<AuthResponse> {
+    const response = await fetch(`${this.userServiceURL}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Registration failed: ${error}`);
+    }
+
+    const rawData: BackendAuthResponse = await response.json();
+    
+    // Normalize the response - backend might use 'id' or 'user_id'
+    const data: AuthResponse = {
+      user_id: rawData.user_id || rawData.id || '',
+      token: rawData.token,
+      username: rawData.username,
+    };
+
+    if (!data.user_id) {
+      throw new Error('Backend did not return user ID');
+    }
+
+    this.token = data.token;
+    this.username = data.username;
+    this.userID = data.user_id;
+    
+    console.log(`✅ Registered new user: ${data.username} (ID: ${data.user_id})`);
+    return data;
+  }
+
+  // ============================================
+  // MATCHMAKING (Room Service)
+  // ============================================
+
+  async joinMatchmaking(userId: string): Promise<{ room_id: string; status: string }> {
+    if (!this.token) {
+      throw new Error('Not authenticated - no token available');
+    }
+
+    console.log(`🎮 Joining matchmaking...`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   Token: ${this.token.substring(0, 20)}...`);
+
+    const response = await fetch(`${this.roomServiceURL}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: JSON.stringify({ user_id: userId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`❌ Join matchmaking failed (${response.status}):`, error);
+      throw new Error(`Failed to join matchmaking: ${error}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Joined matchmaking. Room ID: ${data.room_id}`);
+    return data;
+  }
+
+  async checkRoomReady(roomId: string): Promise<boolean> {
+    const response = await fetch(`${this.roomServiceURL}/room/${roomId}/ready`);
     
     if (!response.ok) {
-      throw new Error(`Failed to check room readiness: ${response.statusText}`);
+      console.warn(`⚠️  Failed to check room status: ${response.status}`);
+      return false;
     }
+
     const data = await response.json();
     return data.ready;
-  } catch (error) {
-    console.error('Check room readiness error:', error);
-    throw error;
+  }
+
+  async leaveRoom(roomId: string): Promise<void> {
+    if (!this.token) return;
+
+    try {
+      await fetch(`${this.roomServiceURL}/rooms/${roomId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+      console.log(`✅ Left room: ${roomId}`);
+    } catch (error) {
+      console.error('❌ Error leaving room:', error);
+    }
+  }
+
+  // ============================================
+  // GAME STATUS (Game Rules Service)
+  // ============================================
+
+  async checkGameReady(roomId: string): Promise<boolean> {
+    const response = await fetch(
+      `${this.gameServiceURL}/game/status?room_id=${roomId}`
+    );
+    
+    if (!response.ok) {
+      console.warn(`⚠️  Failed to check game status: ${response.status}`);
+      return false;
+    }
+
+    const data = await response.json();
+    return data.ready;
+  }
+
+  // ============================================
+  // GETTERS
+  // ============================================
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  getUsername(): string | null {
+    return this.username;
+  }
+
+  getUserID(): string | null {
+    return this.userID;
+  }
+
+  isAuthenticated(): boolean {
+    return this.token !== null && this.userID !== null;
   }
 }
