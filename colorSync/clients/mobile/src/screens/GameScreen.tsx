@@ -11,8 +11,9 @@ interface GameScreenProps {
   onColorClick: (color: ColorOption) => void;
 }
 
-const { width } = Dimensions.get('window');
-const buttonSize = (width - 80) / 2;
+const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+const buttonSize = Math.min((width - 64) / 2, 140); // Max 140px, with proper spacing
 
 export default function GameScreen({
   gameState,
@@ -29,11 +30,11 @@ export default function GameScreen({
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header with Scores */}
       <View style={styles.header}>
         <View style={styles.playerInfo}>
-          <Text style={styles.playerName}>{username}</Text>
+          <Text style={styles.playerName} numberOfLines={1}>{username}</Text>
           <Text style={styles.score}>{gameState.yourScore}</Text>
         </View>
 
@@ -45,7 +46,7 @@ export default function GameScreen({
         </View>
 
         <View style={styles.playerInfo}>
-          <Text style={styles.playerName}>Opponent</Text>
+          <Text style={styles.playerName} numberOfLines={1}>Opponent</Text>
           <Text style={styles.score}>{gameState.opponentScore}</Text>
         </View>
       </View>
@@ -64,7 +65,7 @@ export default function GameScreen({
           </Text>
         </View>
       ) : (
-        <>
+        <View style={styles.gameContent}>
           {/* Word Display */}
           <View style={styles.wordContainer}>
             <Text style={styles.prompt}>What COLOR is this text?</Text>
@@ -81,7 +82,7 @@ export default function GameScreen({
                   key={btn.color}
                   style={[
                     styles.colorButton,
-                    { backgroundColor: btn.bg },
+                    { backgroundColor: btn.bg, width: buttonSize, height: buttonSize },
                     answered && styles.buttonDisabled,
                   ]}
                   onPress={() => onColorClick(btn.color)}
@@ -98,7 +99,7 @@ export default function GameScreen({
                   key={btn.color}
                   style={[
                     styles.colorButton,
-                    { backgroundColor: btn.bg },
+                    { backgroundColor: btn.bg, width: buttonSize, height: buttonSize },
                     answered && styles.buttonDisabled,
                   ]}
                   onPress={() => onColorClick(btn.color)}
@@ -123,7 +124,7 @@ export default function GameScreen({
               <Text style={styles.feedbackText}>✅ Answer submitted!</Text>
             </View>
           )}
-        </>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -138,35 +139,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#16213e',
     borderBottomWidth: 2,
     borderBottomColor: '#0f3460',
   },
   playerInfo: {
     alignItems: 'center',
+    flex: 1,
   },
   playerName: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#aaa',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   score: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#e94560',
   },
   roundInfo: {
     alignItems: 'center',
+    flex: 1,
   },
   roundText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#aaa',
     letterSpacing: 1,
   },
   roundNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -174,79 +177,82 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 24,
   },
   instructionsEmoji: {
-    fontSize: 80,
-    marginBottom: 24,
+    fontSize: 64,
+    marginBottom: 20,
   },
   instructionsTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#e94560',
-    marginBottom: 24,
+    marginBottom: 20,
     letterSpacing: 2,
   },
   instructionsText: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#fff',
     textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: 16,
+    lineHeight: 28,
+    marginBottom: 12,
   },
   bold: {
     fontWeight: 'bold',
     color: '#e94560',
   },
   instructionsRounds: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#aaa',
+  },
+  gameContent: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   wordContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   prompt: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 14 : 16,
     color: '#aaa',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
   },
   word: {
-    fontSize: 72,
+    fontSize: isSmallScreen ? 48 : 64,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   buttonsContainer: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    justifyContent: 'space-around',
+    marginBottom: 12,
   },
   colorButton: {
-    width: buttonSize,
-    height: buttonSize,
-    borderRadius: 16,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: '#000',
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 6,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonLabel: {
-    fontSize: 24,
+    fontSize: isSmallScreen ? 18 : 22,
     fontWeight: 'bold',
     color: '#000',
     textShadowColor: 'rgba(255, 255, 255, 0.3)',
@@ -255,26 +261,28 @@ const styles = StyleSheet.create({
   },
   feedbackWrong: {
     position: 'absolute',
-    top: '50%',
+    top: '45%',
     left: 24,
     right: 24,
     backgroundColor: '#ff4444',
-    padding: 20,
+    padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    elevation: 10,
   },
   feedbackCorrect: {
     position: 'absolute',
-    top: '50%',
+    top: '45%',
     left: 24,
     right: 24,
     backgroundColor: '#44ff44',
-    padding: 20,
+    padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    elevation: 10,
   },
   feedbackText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
   },
