@@ -243,7 +243,7 @@ function App() {
         });
       });
 
-      ws.on<GameOverPayload>('GAME_OVER', (payload) => {
+      ws.on<GameOverPayload>('GAME_OVER', async (payload) => {
         console.log('🏁 Game over! Winner:', payload.winner);
         
         setGameState((prev: GameState) => ({
@@ -256,6 +256,16 @@ function App() {
         }));
         
         setFlowState('GAME_OVER');
+
+        // ✅ LEAVE THE ROOM AUTOMATICALLY
+        console.log('🚪 Leaving room after game over...');
+        try {
+          await apiRef.current.leaveRoom(roomId);
+          console.log('✅ Successfully left room');
+        } catch (error) {
+          console.error('❌ Failed to leave room:', error);
+          // Don't block the UI, just log the error
+        }
       });
 
       ws.on('WRONG_ANSWER', () => {
@@ -278,7 +288,7 @@ function App() {
         ws.off('ERROR');
       };
     }
-  }, [flowState, userId]);
+  }, [flowState, userId, roomId]); // ✅ Add roomId to dependencies
 
   // ============================================
   // GAME ACTIONS
@@ -402,7 +412,6 @@ function App() {
             <p className="hint">Room ID: {roomId}</p>
           </>
         )}
-        {flowState === 'WAITING_GAME' && <p className="status">Preparing game...</p>}
         {flowState === 'CONNECTING' && <p className="status">Connecting to game server...</p>}
       </div>
     </div>
@@ -497,6 +506,33 @@ function App() {
     </div>
   );
 
+  const handlePlayAgain = useCallback(() => {
+    // Reset all game state
+    setFlowState('JOINING');
+    setRoomId('');
+    setGameState({
+      currentRound: 0,
+      maxRounds: 5,
+      word: '',
+      color: '',
+      roundStartTime: null,
+      yourScore: 0,
+      opponentScore: 0,
+      yourLatency: 0,
+      opponentLatency: 0,
+      roundResults: [],
+      winner: null,
+      yourStats: null,
+      opponentStats: null,
+    });
+    setAnswered(false);
+    setShowWrongAnswer(false);
+    setError(null);
+
+    // Disconnect WebSocket
+    wsRef.current.disconnect();
+  }, []);
+
   const renderGameOver = () => {
     const isWinner = gameState.winner === userId;
     const isDraw = gameState.winner === 'draw';
@@ -578,7 +614,7 @@ function App() {
 
         <button
           className="btn-primary"
-          onClick={() => window.location.reload()}
+          onClick={handlePlayAgain}
         >
           🎮 Play Again
         </button>
